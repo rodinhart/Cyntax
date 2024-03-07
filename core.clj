@@ -10,14 +10,18 @@
   ([x form] (let [s (seq form)] '(~(first s) ~x ~@(rest s))))
   ([x form & rest] '(-> (-> ~x ~form) ~@rest)))
 
+(defn assoc-in [map keys val]
+  (if (= (count keys) 0)
+    val
+    (assoc map (keys 0) (assoc-in (map (keys 0)) (slice keys 1) val))))
+
 (defmacro cond
   ([] nil)
   ([test expr & rest] '(if ~test ~expr (cond ~@rest))))
 
 (defmacro not= [lhs rhs] '(not (= ~lhs ~rhs)))
 
-(defmacro | [lhs rhs]
-  '(~rhs ~lhs))
+(defn | [lhs rhs] (rhs lhs))
 
 (defmacro |>
   ([a] a)
@@ -198,7 +202,8 @@
       
       (-> df
         (assoc "keys" (conj (df "keys") key))
-        (assoc "data" (assoc (df "data") key (map-array fun (df "indices")))))))]
+        ; assoc-in?
+        (assoc-in ["data" key] (map-array fun (df "indices"))))))]
     (assoc scope "self" (fold rf dataframe calcs)))))
 
 ;; yuk
@@ -231,3 +236,8 @@
 ; SUM a          -> ($) => SUM(($) => $["a"], $)                NO!?
 ;                -> ($) => SUM("a", $)
 ; 12 * SUM a     -> ($) => 12 * SUM("a", $)
+
+; if we didn't have custom scope, users could access core functions
+; well, could they? If all non-identifiers were UPPERCASE, and only
+; known operators are allowed, we'd be good?
+; anything with foo* is internal? Macros are not an issue, can be named foo?

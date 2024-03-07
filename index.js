@@ -493,6 +493,7 @@ const $ = {
   macroexpand: (form) => macroExpand($)(form),
   not: (x) => x === false || x === null,
   Null,
+  slice: (arr, start) => arr.slice(start),
   string: (x) => (typeof x === "symbol" ? Sn(x) : ""),
   "symbol?": (x) => typeof x === "symbol",
   "upper-case": (s) => s.toUpperCase(),

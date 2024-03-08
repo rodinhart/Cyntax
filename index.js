@@ -460,6 +460,7 @@ const $ = {
   "+": (...xs) => xs.reduce((r, x) => r + x, 0),
   "-": (a, b) => a - b,
   "*": (...xs) => xs.reduce((r, x) => r * x, 1),
+  "/": (a, b) => a / b,
   "%": (a, b) => a % b,
   "=": (a, b) => a === b, // need eqal
   "<": (a, b) => a < b,
@@ -507,6 +508,7 @@ const $ = {
   macroexpand: (form) => macroExpand($)(form),
   not: (x) => x === false || x === null,
   Null,
+  "ROUND*": (n, x) => Math.round(x * 10 ** n) / 10 ** n,
   slice: (arr, start) => arr.slice(start),
   string: (x) => (typeof x === "symbol" ? Sn(x) : ""),
   "symbol?": (x) => typeof x === "symbol",

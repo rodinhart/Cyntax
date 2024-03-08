@@ -195,7 +195,9 @@
   { "hashmap" (into [] (map fun (tuple "hashmap")))}))
 
 
-(defmacro DERIVE [calcs] '(DERIVE* ~(scope-tuple calcs) scope))
+(defmacro DERIVE
+  ([calcs] '(DERIVE* ~(scope-tuple calcs) scope))
+  ([calcs scope] '(DERIVE* ~(scope-tuple calcs) ~scope)))
 
 (defn DERIVE* [calcs scope]
   (let [
@@ -210,8 +212,9 @@
     
     (assoc scope "self" (fold rf dataframe calcs))))
 
-(defmacro FILTER [expr]
-  '(FILTER* ~(scope-expression expr) scope))
+(defmacro FILTER
+  ([expr] '(FILTER* ~(scope-expression expr) scope))
+  ([expr scope] '(FILTER* ~(scope-expression expr) ~scope)))
 
 (defn FILTER* [predicate scope]
   (let [
@@ -236,20 +239,26 @@
 
 (defmacro PQL [program] '(fn [scope] ~program))
 
+(defmacro ROUND
+  ([n] '(ROUND* ~n scope))
+  ([n x] '(ROUND* ~n ~x)))
+
 (defmacro ROWS [] '(ROWS* scope))
 (defn ROWS* [scope]
   (assoc-in scope ["self" "indices"]
     (into [] (take (+ (scope "_ptr") 1) (get-in scope ["self" "indices"])))))
 
-(defmacro SUM [expr] '((SUM* ~(scope-expression expr)) scope))
+(defmacro SUM
+  ([expr] '(SUM* ~(scope-expression expr) scope))
+  ([expr scope] '(SUM* ~(scope-expression expr) ~scope)))
 
-(defn SUM* [fun]
-  (fn [scope] (let [
+(defn SUM* [fun scope]
+  (let [
     dataframe (scope "self")
     rf (fn [r index] (+ r (fun (create-obj dataframe index))))
     sum (fold rf 0 (dataframe "indices"))]
     
-    sum)))
+    sum))
 
 
 (def data {
@@ -267,4 +276,3 @@
     })
   )
 ) { "data" data })
-

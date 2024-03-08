@@ -27,6 +27,12 @@
 
 (defn not= [lhs rhs] (not (= lhs rhs)))
 
+;; could use loop?
+(defn get-in [map keys]
+  (if (= (count keys) 0)
+    map
+    (get-in (map (keys 0)) (slice keys 1))))
+
 ;; collections
 (extend Null Coll
   (conj [item] (cons item nil))
@@ -123,8 +129,9 @@
         s1))]
     (help (seq coll1) (seq coll2)))))
 
-(defn map-array [f arr]
-  (into [] (map f arr)))
+(defn map-array
+  ([f arr] (into [] (map f arr)))
+  ([f arr1 arr2] (into [] (map f arr1 arr2))))
 
 (defn range
   ([end] (range 0 end))
@@ -195,11 +202,11 @@
     dataframe (scope "self")
     rf (fn [df p] (let [
       key (fst p)
-      fun (fn [index] ((snd p) (assoc (create-obj df index) "self" df)))]
+      fun (fn [index i] ((snd p) (assoc (create-obj df index) "self" df "_ptr" i)))]
 
       (-> df
         (assoc "keys" (conj (df "keys") key))
-        (assoc-in ["data" key] (map-array fun (df "indices"))))))]
+        (assoc-in ["data" key] (map-array fun (df "indices") (range (count (df "indices"))))))))]
     
     (assoc scope "self" (fold rf dataframe calcs))))
 
@@ -229,6 +236,11 @@
 
 (defmacro PQL [program] '(fn [scope] ~program))
 
+(defmacro ROWS [] '(ROWS* scope))
+(defn ROWS* [scope]
+  (assoc-in scope ["self" "indices"]
+    (into [] (take (+ (scope "_ptr") 1) (get-in scope ["self" "indices"])))))
+
 (defmacro SUM [expr] '((SUM* ~(scope-expression expr)) scope))
 
 (defn SUM* [fun]
@@ -245,13 +257,14 @@
   "y" (into [] (range 1 11))
 })
 
+;; rename |> to scope-|
 ((PQL
   (|>
     (FROM data)
     (FILTER (< y 6))
     (DERIVE {
       "r" (* y y)
-      "s" (SUM y)
+      "s" (|> (ROWS) (SUM y)) ; really ROWS ..0, running total
     })
   )
 ) { "data" data })

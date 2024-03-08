@@ -10,6 +10,12 @@
   ([x form] (let [s (seq form)] '(~(first s) ~x ~@(rest s))))
   ([x form & rest] '(-> (-> ~x ~form) ~@rest)))
 
+(defn | [val & pipes]
+  (loop [cur val s (seq pipes)]
+    (if s
+      (recur ((first s) cur) (rest s))
+      cur)))
+
 (defn assoc-in [map keys val]
   (if (= (count keys) 0)
     val
@@ -19,13 +25,7 @@
   ([] nil)
   ([test expr & rest] '(if ~test ~expr (cond ~@rest))))
 
-(defmacro not= [lhs rhs] '(not (= ~lhs ~rhs)))
-(defn | [val & pipes]
-  (loop [cur val s (seq pipes)]
-    (if s
-      (recur ((first s) cur) (rest s))
-      cur)))
-
+(defn not= [lhs rhs] (not (= lhs rhs)))
 
 ;; collections
 (extend Null Coll
@@ -146,10 +146,9 @@
 (defn fst [tuple] (tuple 0))
 (defn snd [tuple] (tuple 1))
 
-;; into [] should not be needed
 (defmacro |> [val & exprs]
   (let [
-    pipes (into [] (map (fn [expr] '(fn [scope] ~expr)) exprs))]
+    pipes (map-array (fn [expr] '(fn [scope] ~expr)) exprs)]
   
   '(| ~val ~@pipes)))
 
@@ -163,34 +162,23 @@
 (defn scope-expression [expr]
   '(fn [scope] ~(scope-identifiers expr)))
 
-;; needs recursion on data structures
+;; needs recursion on other data structures
 (defn scope-identifiers [expr]
   (cond
     (and
       (symbol? expr)
-      (not= expr 'fn2)
       (let [s (string expr)] (not= (upper-case s) s))) '(scope ~(string expr))
 
+    ; change to (scope-get scope key)
     (and (list? expr) (not= (car expr) 'scope)) (into () (into () (map scope-identifiers expr)))
+    
     true expr))
-
-(defn ensure-|> [expr] (cond
-  (and (list? expr) (= (car expr) '|>)) expr
-  (and (list? expr) (= (car expr) '|)) '(|> ~@(cdr expr))
-  true '(|> ~expr)))
 
 (defn scope-pipeline [expr] (let [
   pipeline (if (and (list? expr) (= (car expr) '|>))
     '(|> (FROM self) ~@(cdr expr))
     '(|> (FROM self) ~expr))]
   (scope-expression pipeline)))
-
-(defn scope-pipeline2 [expr] (let [
-  using-|> (ensure-|> expr)
-  pipeline '(|> (FROM self) ~@(cdr using-|>))]
-  
-  (scope-expression pipeline))) 
-
 
 ; awkward having hashmap appear
 ; also do with destructuring for pairs
@@ -200,10 +188,10 @@
   { "hashmap" (into [] (map fun (tuple "hashmap")))}))
 
 
-(defmacro DERIVE [calcs] '((DERIVE* ~(scope-tuple calcs)) scope))
+(defmacro DERIVE [calcs] '(DERIVE* ~(scope-tuple calcs) scope))
 
-(defn DERIVE* [calcs]
-  (fn [scope] (let [
+(defn DERIVE* [calcs scope]
+  (let [
     dataframe (scope "self")
     rf (fn [df p] (let [
       key (fst p)
@@ -213,23 +201,23 @@
         (assoc "keys" (conj (df "keys") key))
         (assoc-in ["data" key] (map-array fun (df "indices"))))))]
     
-    (assoc scope "self" (fold rf dataframe calcs)))))
+    (assoc scope "self" (fold rf dataframe calcs))))
 
 (defmacro FILTER [expr]
-  '((FILTER* ~(scope-expression expr)) scope))
+  '(FILTER* ~(scope-expression expr) scope))
 
-(defn FILTER* [predicate]
-  (fn [scope] (let [
+(defn FILTER* [predicate scope]
+  (let [
     dataframe (scope "self")
     p (fn [index] (predicate (create-obj dataframe index)))
     result (into [] (filter p (dataframe "indices")))]
 
     (assoc scope
-      "self" (assoc dataframe "indices" result)))))
+      "self" (assoc dataframe "indices" result))))
 
-(defmacro FROM [expr] '(FROM* scope ~(scope-identifiers expr)))
+(defmacro FROM [expr] '(FROM* ~(scope-identifiers expr) scope))
 
-(defn FROM* [scope data]
+(defn FROM* [data scope]
   (assoc scope "self"
     (if (contains? data "data" "keys" "indices")
       data

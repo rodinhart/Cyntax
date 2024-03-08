@@ -153,7 +153,7 @@
 (defn fst [tuple] (tuple 0))
 (defn snd [tuple] (tuple 1))
 
-(defmacro |> [val & exprs]
+(defmacro SCOPE-| [val & exprs]
   (let [
     pipes (map-array (fn [expr] '(fn [scope] ~expr)) exprs)]
   
@@ -182,9 +182,9 @@
     true expr))
 
 (defn scope-pipeline [expr] (let [
-  pipeline (if (and (list? expr) (= (car expr) '|>))
-    '(|> (FROM self) ~@(cdr expr))
-    '(|> (FROM self) ~expr))]
+  pipeline (if (and (list? expr) (= (car expr) 'SCOPE-|))
+    '(SCOPE-| (FROM self) ~@(cdr expr))
+    '(SCOPE-| (FROM self) ~expr))]
   (scope-expression pipeline)))
 
 ; awkward having hashmap appear
@@ -257,14 +257,13 @@
   "y" (into [] (range 1 11))
 })
 
-;; rename |> to scope-|
 ((PQL
-  (|>
+  (SCOPE-|
     (FROM data)
     (FILTER (< y 6))
     (DERIVE {
       "r" (* y y)
-      "s" (|> (ROWS) (SUM y)) ; really ROWS ..0, running total
+      "s" (SCOPE-| (ROWS) (SUM y)) ; really ROWS ..0, running total
     })
   )
 ) { "data" data })

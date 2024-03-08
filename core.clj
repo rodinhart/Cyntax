@@ -190,7 +190,7 @@
 ; awkward having hashmap appear
 ; also do with destructuring for pairs
 (defn scope-tuple [tuple] (let [
-  fun (fn [p] [(fst p) (scope-pipeline (snd p))])]
+  fun (fn [p] [(fst p) (scope-expression (snd p))])]
   
   { "hashmap" (into [] (map fun (tuple "hashmap")))}))
 

@@ -72,7 +72,7 @@ const toFn = (op) =>
     ? op
     : op?.arity
     ? (...args) => (op.arity[args.length] ?? op.arity[-1])(...args)
-    : (ix) => op[ix]
+    : (ix) => op[ix] ?? "FUBAR"
 
 // Compiler
 const withType = (dispatch) => (exp) => {
@@ -324,6 +324,10 @@ const macroExpand = ($) =>
         return macroExpand($)(toFn($[Sn(op)])(...rands))
       }
 
+      if (op === S("quote")) {
+        return exp
+      }
+
       return list(macroExpand($)(op), ...rands.map(macroExpand($)))
     },
     Array: (exp) => exp.map(macroExpand($)),
@@ -355,7 +359,7 @@ const prn = withType({
   },
   Hashmap: (exp) =>
     `{ ${(exp.hashmap ?? Object.entries(exp))
-      .map(([key, val]) => `${prn(key)}: ${prn(val)}`)
+      .map(([key, val]) => `${prn(key)} ${prn(val)}`)
       .join(", ")} }`,
   unknown: (exp) => `[type ${exp?.constructor?.name}]`,
 })
@@ -461,7 +465,14 @@ const $ = {
   "<": (a, b) => a < b,
   ">": (a, b) => a > b,
 
-  and: (a, b) => (a !== false && a !== null ? b : a),
+  and: {
+    arity: {
+      0: () => true,
+      1: (x) => x,
+      "-1": (x, ...next) =>
+        x !== false && x !== null ? toFn($.and)(...next) : x,
+    },
+  },
   assoc: (map, ...xs) => {
     const result = { ...map }
     for (let i = 0; i + 1 < xs.length; i += 2) {
@@ -470,11 +481,14 @@ const $ = {
 
     return result
   },
+  car: (exp) => exp.car,
+  cdr: (exp) => exp.cdr,
   comp:
     (g, f) =>
     (...args) =>
       toFn(g)(toFn(f)(...args)),
   cons,
+  "contains?": (map, ...keys) => keys.every((key) => key in map),
   dissoc: (map, ...keys) => {
     const set = new Set(keys)
     const result = {}
@@ -550,20 +564,28 @@ const input = await fetch("./core.clj").then((r) => r.text())
 
 const code = read(`[${input}]`)
 
+const debug = (...args) => {
+  // console.log(...args)
+}
 const result = code.reduce((_, form) => {
   let expanded
   let javascript
   let compiled
   try {
-    // console.log("--")
-    // console.log(prn(form))
-    expanded = macroExpand($)(form)
-    // console.log(prn(expanded))
-    javascript = generateCode(expanded)
-    // console.log(javascript)
-    compiled = eval(`(($) => ${javascript})`)
+    debug("--")
+    debug("form", prn(form))
 
-    return compiled($)
+    expanded = macroExpand($)(form)
+    debug("expanded", prn(expanded))
+
+    javascript = generateCode(expanded)
+    debug("javascript", javascript)
+
+    compiled = eval(`(($) => ${javascript})`)
+    const r = compiled($)
+    debug("r", r)
+
+    return r
   } catch (e) {
     console.error(e)
     console.log(prn(form))
@@ -572,6 +594,8 @@ const result = code.reduce((_, form) => {
     throw e
   }
 }, null)
+
+// console.log(result)
 
 document.getElementById("output").innerText = prn(result)
 if (result?.self?.data) {
@@ -592,9 +616,6 @@ if (result?.self?.data) {
   `
 }
 
-const debug = (...args) => {
-  // console.log(...args)
-}
 window.l = (strings, ...exps) => {
   const tokens = read(strings.join(""))
   debug("tokens", prn(tokens))

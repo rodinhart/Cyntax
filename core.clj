@@ -20,12 +20,12 @@
   ([test expr & rest] '(if ~test ~expr (cond ~@rest))))
 
 (defmacro not= [lhs rhs] '(not (= ~lhs ~rhs)))
+(defn | [val & pipes]
+  (loop [cur val s (seq pipes)]
+    (if s
+      (recur ((first s) cur) (rest s))
+      cur)))
 
-(defn | [lhs rhs] (rhs lhs))
-
-(defmacro |>
-  ([a] a)
-  ([a b & rest] '(|> (| ~a ~b) ~@rest)))
 
 ;; collections
 (extend Null Coll
@@ -146,6 +146,13 @@
 (defn fst [tuple] (tuple 0))
 (defn snd [tuple] (tuple 1))
 
+;; into [] should not be needed
+(defmacro |> [val & exprs]
+  (let [
+    pipes (into [] (map (fn [expr] '(fn [scope] ~expr)) exprs))]
+  
+  '(| ~val ~@pipes)))
+
 ;; destructure keys and data
 (defn create-obj [dataframe index]
   (into {} (map (fn [key] (let [
@@ -161,18 +168,55 @@
   (cond
     (and
       (symbol? expr)
+      (not= expr 'fn2)
       (let [s (string expr)] (not= (upper-case s) s))) '(scope ~(string expr))
-    (list? expr) (into () (into () (map scope-identifiers expr)))
+
+    (and (list? expr) (not= (car expr) 'scope)) (into () (into () (map scope-identifiers expr)))
     true expr))
+
+(defn ensure-|> [expr] (cond
+  (and (list? expr) (= (car expr) '|>)) expr
+  (and (list? expr) (= (car expr) '|)) '(|> ~@(cdr expr))
+  true '(|> ~expr)))
+
+(defn scope-pipeline [expr] (let [
+  pipeline (if (and (list? expr) (= (car expr) '|>))
+    '(|> (FROM self) ~@(cdr expr))
+    '(|> (FROM self) ~expr))]
+  (scope-expression pipeline)))
+
+(defn scope-pipeline2 [expr] (let [
+  using-|> (ensure-|> expr)
+  pipeline '(|> (FROM self) ~@(cdr using-|>))]
+  
+  (scope-expression pipeline))) 
+
 
 ; awkward having hashmap appear
 ; also do with destructuring for pairs
-(defn scope-tuple [tuple] { "hashmap"
-  (into [] (map (fn [p] [(fst p) (scope-expression (snd p))]) (tuple "hashmap"))) })
+(defn scope-tuple [tuple] (let [
+  fun (fn [p] [(fst p) (scope-pipeline (snd p))])]
+  
+  { "hashmap" (into [] (map fun (tuple "hashmap")))}))
 
+
+(defmacro DERIVE [calcs] '((DERIVE* ~(scope-tuple calcs)) scope))
+
+(defn DERIVE* [calcs]
+  (fn [scope] (let [
+    dataframe (scope "self")
+    rf (fn [df p] (let [
+      key (fst p)
+      fun (fn [index] ((snd p) (assoc (create-obj df index) "self" df)))]
+
+      (-> df
+        (assoc "keys" (conj (df "keys") key))
+        (assoc-in ["data" key] (map-array fun (df "indices"))))))]
+    
+    (assoc scope "self" (fold rf dataframe calcs)))))
 
 (defmacro FILTER [expr]
-  '(FILTER* ~(scope-expression expr)))
+  '((FILTER* ~(scope-expression expr)) scope))
 
 (defn FILTER* [predicate]
   (fn [scope] (let [
@@ -183,31 +227,21 @@
     (assoc scope
       "self" (assoc dataframe "indices" result)))))
 
-(defmacro FROM [expr] '(FROM* ~(scope-identifiers expr)))
+(defmacro FROM [expr] '(FROM* scope ~(scope-identifiers expr)))
 
-(defn FROM* [data] { "self" {
-  "data" data
-  "keys" (into [] (map fst data))
-  "indices" (into [] (range 0 (fold max 0 (map (comp count snd) data))))
-}})
+(defn FROM* [scope data]
+  (assoc scope "self"
+    (if (contains? data "data" "keys" "indices")
+      data
+      {
+      "data" data
+      "keys" (into [] (map fst data))
+      "indices" (into [] (range 0 (fold max 0 (map (comp count snd) data))))
+      })))
 
-(defmacro DERIVE [calcs] '(DERIVE* ~(scope-tuple calcs)))
+(defmacro PQL [program] '(fn [scope] ~program))
 
-(defn DERIVE* [calcs]
-  (fn [scope] (let [
-    dataframe (scope "self")
-    rf (fn [df p] (let [
-      key (fst p)
-      fun (fn [index] ((snd p) (assoc (create-obj df index) "self" df )))]
-      
-      (-> df
-        (assoc "keys" (conj (df "keys") key))
-        ; assoc-in?
-        (assoc-in ["data" key] (map-array fun (df "indices"))))))]
-    (assoc scope "self" (fold rf dataframe calcs)))))
-
-;; yuk
-(defmacro SUM [expr] '((SUM* (fn [scope] ~expr)) scope))
+(defmacro SUM [expr] '((SUM* ~(scope-expression expr)) scope))
 
 (defn SUM* [fun]
   (fn [scope] (let [
@@ -223,21 +257,14 @@
   "y" (into [] (range 1 11))
 })
 
-((fn [scope]
+((PQL
   (|>
     (FROM data)
     (FILTER (< y 6))
-    (DERIVE { "r" (* y y), "s" (SUM y) })
+    (DERIVE {
+      "r" (* y y)
+      "s" (SUM y)
+    })
   )
 ) { "data" data })
 
-; a * b          -> ($) => $["a"] * $["b"]
-; FILTER (= a b) -> ($) => FILTER(($) => $["a"] === $["b"], $)
-; SUM a          -> ($) => SUM(($) => $["a"], $)                NO!?
-;                -> ($) => SUM("a", $)
-; 12 * SUM a     -> ($) => 12 * SUM("a", $)
-
-; if we didn't have custom scope, users could access core functions
-; well, could they? If all non-identifiers were UPPERCASE, and only
-; known operators are allowed, we'd be good?
-; anything with foo* is internal? Macros are not an issue, can be named foo?

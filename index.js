@@ -501,6 +501,7 @@ const $ = {
 
     return result
   },
+  keys: (map) => Object.keys(map),
   List,
   list,
   "list?": (x) => x instanceof List,

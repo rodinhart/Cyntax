@@ -25,7 +25,15 @@
   ([] nil)
   ([test expr & rest] '(if ~test ~expr (cond ~@rest))))
 
+(defn constantly [x] (fn [& args] x))
+
 (defn not= [lhs rhs] (not (= lhs rhs)))
+
+(defn update [map key f x]
+  (assoc map key (f (map key) x)))
+
+(defn update-in [map keys f x]
+  (assoc-in map keys (f (get-in map keys) x)))
 
 ;; could use loop?
 (defn get-in [map keys]
@@ -276,3 +284,39 @@
     })
   )
 ) { "data" data })
+
+(defmacro GROUP_BY 
+  ([set pipeline] '(GROUP_BY* ~set ~(scope-expression pipeline) scope))
+  ([set pipeline scope] '(GROUP_BY* ~set ~(scope-expression pipeline) ~scope)))
+
+(defn GROUP_BY* [set pipeline scope]
+  (let [
+    dataframe (scope "self")
+    key ((keys set) 0)
+    rf (fn [groups index]
+      (let [val (get-in dataframe ["data" key index])]
+        (if (contains? groups val)
+          (assoc groups val (conj (groups val) index))
+          (assoc groups val [index]))))
+    groups (fold rf {} (dataframe "indices"))
+    new (assoc dataframe "data" { key [] "agg" [] } "keys" [key "agg"] "indices" [])
+    rf (fn [result group]
+      (let [
+        agg (pipeline (assoc-in scope ["self" "indices"] (group 1)))]
+        
+        (-> result
+          (update "indices" conj (count (result "indices")))
+          (assoc-in ["data" key] (get-in dataframe ["data" key]))
+          (update-in ["data" "agg"] conj agg))))]
+  
+  (assoc scope "self" (fold rf new groups))))
+
+((PQL
+  (SCOPE-|
+    (FROM data)
+    (GROUP_BY { "x" "x" } (SUM y))
+  )
+) { "data" data })
+
+
+;; need get-in but with fn, like over-in: update-in

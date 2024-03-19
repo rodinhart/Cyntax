@@ -16,3 +16,5 @@ unknown    [type User]
 
 - make macro a fn with meta data
 - destructering
+- ffi
+- fix arity

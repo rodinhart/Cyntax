@@ -24,6 +24,8 @@ List.prototype[Symbol.iterator] = function* () {
   }
 }
 
+const cons = (car, cdr) => new List(car, cdr)
+
 // (deftype ArraySeq [arr i])
 function ArraySeq(arr, i) {
   if (!(this instanceof ArraySeq)) return new ArraySeq(arr, i)
@@ -32,8 +34,6 @@ function ArraySeq(arr, i) {
   this.i = i
 }
 ArraySeq.params = [S("arr"), S("i")]
-
-const cons = (car, cdr) => new List(car, cdr)
 
 const getType = (exp) =>
   exp === null

@@ -19,3 +19,4 @@ unknown    [type User]
 - ffi
 - fix arity
 - review native functions (specially invoke, resolve, toFn)
+- allow spaces in strings

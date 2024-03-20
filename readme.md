@@ -18,3 +18,4 @@ unknown    [type User]
 - destructering
 - ffi
 - fix arity
+- review native functions (specially invoke, resolve, toFn)

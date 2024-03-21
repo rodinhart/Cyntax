@@ -1,6 +1,6 @@
 import cyntax from "./cyntax.js"
 
-const pql = cyntax({})`
+export default cyntax({})`
 
 (defn fst [tuple] (tuple 0))
 (defn snd [tuple] (tuple 1))
@@ -163,5 +163,3 @@ const pql = cyntax({})`
 ) { "data" data }))
 
 `
-
-export default pql

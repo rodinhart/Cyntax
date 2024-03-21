@@ -189,6 +189,37 @@ export const genCode = withType({
         // (fn ([x] x) ([x y] (+ x y)))
         const [...overloads] = rands
 
+        const arities = overloads.map((overload) => {
+          const [p, b] = overload
+
+          const args = []
+          for (let i = 0; i < p.length; i++) {
+            if (p[i] !== S("&")) {
+              args.push(`,${JSON.stringify(Sn(p[i]))}:args[${i}]`)
+            } else {
+              args.push(`,${JSON.stringify(Sn(p[i + 1]))}:args.slice(${i})`)
+              i++
+            }
+          }
+
+          const body = genCode(b)
+
+          return `
+          ${!p.includes(S("&")) ? `case ${p.length}:` : "default:"}
+            return (($) => ${body})({...$${args.join("")}})
+          `
+        })
+
+        const arityError = "Arity ${args.length} not supported."
+
+        return `((...args) => {
+          switch (args.length) {
+            ${arities.join("\n")}
+          }
+
+          throw new Error(\`${arityError}\`)
+        })`
+
         return `({
           arity: {
             ${overloads

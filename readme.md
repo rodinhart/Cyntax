@@ -78,7 +78,6 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 - make macro a fn with meta data
 - destructering
 - ffi
-- fix arity
 - review native functions (specially invoke, resolve, toFn)
 - allow spaces in strings
 

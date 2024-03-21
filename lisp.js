@@ -76,12 +76,8 @@ const resolve = ($, name) => {
   return $[name]
 }
 
-const toFn = (op) =>
-  typeof op === "function"
-    ? op
-    : op?.arity
-    ? (...args) => (op.arity[args.length] ?? op.arity[-1])(...args)
-    : (ix) => op[ix] ?? "FUBAR"
+// check for array and pojo
+const toFn = (op) => (typeof op === "function" ? op : (ix) => op[ix] ?? "FUBAR")
 
 // Compiler
 const withType =
@@ -218,44 +214,6 @@ export const genCode = withType({
           }
 
           throw new Error(\`${arityError}\`)
-        })`
-
-        return `({
-          arity: {
-            ${overloads
-              .map((overload) => {
-                const [p, b] = overload
-
-                const params = []
-                for (let i = 0; i < p.length; i++) {
-                  if (p[i] !== S("&")) {
-                    params.push(`$${i}`)
-                  } else {
-                    params.push(`...$${i}`)
-                    i++
-                  }
-                }
-
-                const args = []
-                for (let i = 0; i < p.length; i++) {
-                  if (p[i] !== S("&")) {
-                    args.push(`,${JSON.stringify(Sn(p[i]))}:$${i}`)
-                  } else {
-                    args.push(`,${JSON.stringify(Sn(p[i + 1]))}:$${i}`)
-                    i++
-                  }
-                }
-
-                const body = genCode(b)
-
-                return `[${
-                  !p.includes(S("&")) ? p.length : -1
-                }]: ((${params.join(",")}) => (($) => ${body})({...$${args.join(
-                  ""
-                )}}))`
-              })
-              .join(", ")}
-            }
         })`
       }
     }
@@ -509,13 +467,20 @@ export const native = {
   "<": (a, b) => a < b,
   ">": (a, b) => a > b,
 
-  and: {
-    arity: {
-      0: () => true,
-      1: (x) => x,
-      "-1": (x, ...next) =>
-        x !== false && x !== null ? toFn(native.and)(...next) : x,
-    },
+  // define macro in core?
+  and: (...args) => {
+    switch (args.length) {
+      case 0:
+        return true
+
+      case 1:
+        return args[0]
+
+      default:
+        return args[0] !== false && args[0] !== null
+          ? native.and(...args.slice(1))
+          : args[0]
+    }
   },
   ArraySeq,
   assoc: (map, ...xs) => {
@@ -528,6 +493,8 @@ export const native = {
   },
   car: (exp) => exp.car,
   cdr: (exp) => exp.cdr,
+
+  // define as macro in core?
   comp:
     (g, f) =>
     (...args) =>

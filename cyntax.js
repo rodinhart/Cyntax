@@ -1,4 +1,10 @@
 import core from "./core.js"
-import { lisp, native } from "./lisp.js"
+import { lisp, macroExpand, native } from "./lisp.js"
 
-export default ($) => lisp({ ...native, ...core, ...$ })
+export default ($) =>
+  lisp({
+    ...native,
+    macroexpand: macroExpand({ ...native, ...core, ...$ }),
+    ...core,
+    ...$,
+  })

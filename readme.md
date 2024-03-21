@@ -80,6 +80,7 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 - ffi
 - review native functions (specially invoke, resolve, toFn)
 - allow spaces in strings
+- and#
 
 ## Dispatch table
 

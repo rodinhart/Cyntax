@@ -1,3 +1,4 @@
+import cyntax from "./cyntax.js"
 import { prn } from "./lisp.js"
 import pql from "./pql.js"
 
@@ -21,3 +22,5 @@ if (result?.self?.data) {
     </table>
   `
 }
+
+window.c = (t) => prn(cyntax({})([`(def __ ${t})`]).__)

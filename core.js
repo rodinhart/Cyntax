@@ -20,6 +20,13 @@ export default lisp(native)`
       (recur ((first s) cur) (rest s))
       cur)))
 
+(defmacro and
+  ([] true)
+  ([x] x)
+  ([x & rest]
+    '(let [and# ~x]
+      (if and# (and ~@rest) and#))))
+
 (defn assoc-in [map keys val]
   (if (= (count keys) 0)
     val

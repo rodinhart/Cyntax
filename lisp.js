@@ -282,17 +282,13 @@ export const genCode = withType({
         number: (exp) => String(exp),
         string: (exp) => JSON.stringify(exp),
         List: (exp) => {
-          return `$["list"](${[...exp]
-            .map((x) => {
-              if (x instanceof List && x.car === S("unquote")) {
-                return genCode(x.cdr.car)
-              } else if (x instanceof List && x.car === S("unquote-splice")) {
-                return `...${genCode(x.cdr.car)}`
-              } else {
-                return quote(x)
-              }
-            })
-            .join(",")})`
+          if (exp.car === S("unquote")) {
+            return genCode(exp.cdr.car)
+          } else if (exp.car === S("unquote-splice")) {
+            return `...${genCode(exp.cdr.car)}`
+          }
+
+          return `$["list"](${[...exp].map(quote).join(",")})`
         },
         Array: (exp) => `[${exp.map(quote).join(",")}]`,
         Hashmap: (exp) => `({ hashmap: ${quote(exp.hashmap)} })`,
@@ -468,7 +464,7 @@ export const native = {
   ">": (a, b) => a > b,
 
   // define macro in core?
-  and: (...args) => {
+  and2: (...args) => {
     switch (args.length) {
       case 0:
         return true
@@ -517,8 +513,8 @@ export const native = {
   List,
   list,
   "list?": (x) => x instanceof List,
+  log: console.log,
   max: (...xs) => Math.max(...xs),
-  macroexpand: (form) => macroExpand($)(form),
   not: (x) => x === false || x === null,
   Null,
   resolve,

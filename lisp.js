@@ -1,10 +1,5 @@
 // Type system
 
-// (deftype Null [])
-const Null = {}
-Null.params = []
-Null.prototype = Null
-
 const S = (name) => Symbol.for(name)
 const Sn = (symbol) => Symbol.keyFor(symbol)
 
@@ -50,7 +45,7 @@ const getType = (exp) =>
     ? "List"
     : Array.isArray(exp)
     ? "Array"
-    : exp?.["Seq/first"]
+    : exp?.constructor?.["Seq/first"]
     ? "Seq"
     : exp?.constructor === Object || exp?.hashmap
     ? "Hashmap"
@@ -59,11 +54,12 @@ const getType = (exp) =>
 const list = (...xs) => [...xs].reverse().reduce((r, x) => cons(x, r), null)
 
 // Runtime helpers
-const invoke = (obj, protocol, method, args) => {
+// move to core? nothing here that is js specific?
+const invoke = (type, protocol, method, obj, args) => {
   try {
-    return (obj === null ? Null : obj)[`${Sn(protocol)}/${Sn(method)}`](...args)
+    return type[`${Sn(protocol)}/${Sn(method)}`](obj, ...args)
   } catch (e) {
-    console.log(obj, Sn(protocol), Sn(method))
+    console.log(type, Sn(protocol), Sn(method))
     throw e
   }
 }
@@ -109,22 +105,22 @@ export const genCode = withType({
     }
 
     if (op === S("defprotocol")) {
-      const [name, ...fns] = rands
+      const [protocolName, ...fns] = rands
+      const name = JSON.stringify(Sn(protocolName))
+
       const compiledMethods = fns.map((fn) => {
         const [method] = fn
         const compiledName = Sn(method)
 
         return `$[${JSON.stringify(
           compiledName
-        )}]=(obj, ...args) => $.invoke(obj, Symbol.for(${JSON.stringify(
-          Sn(name)
-        )}), Symbol.for(${JSON.stringify(Sn(method))}), args)`
+        )}]=(obj, ...args) => $.invoke($[obj?.constructor?.name ?? "Nil"] ?? obj, Symbol.for(${name}), Symbol.for(${JSON.stringify(
+          Sn(method)
+        )}), obj, args)`
       })
 
       // use compile (quote name)
-      return `(${compiledMethods.join(",")},Symbol.for(${JSON.stringify(
-        Sn(name)
-      )}))`
+      return `(${compiledMethods.join(",")},Symbol.for(${name}))`
     }
 
     if (op === S("deftype")) {
@@ -150,7 +146,7 @@ export const genCode = withType({
 
       const typeParams = [...type.params].map(
         (param) =>
-          `,${JSON.stringify(Sn(param))}: this[${JSON.stringify(Sn(param))}]`
+          `,${JSON.stringify(Sn(param))}: obj[${JSON.stringify(Sn(param))}]`
       )
 
       const addMethods = methods.map((method) => {
@@ -162,9 +158,7 @@ export const genCode = withType({
         )
         const body = genCode(b)
 
-        return `${genCode(
-          typeName
-        )}.prototype[${namespaced}] = function(...args) {
+        return `${genCode(typeName)}[${namespaced}] = (obj, ...args) => {
           return (($) => ${body})({...$${typeParams.join("")}${params.join(
           ""
         )}})
@@ -348,8 +342,8 @@ export const prn = withType({
     const r = []
     let c = exp
     while (c) {
-      r.push(c["Seq/first"]())
-      c = c["Seq/rest"]()
+      r.push(c.constructor["Seq/first"](c))
+      c = c.constructor["Seq/rest"](c)
     }
 
     return `(${r.map(prn).join(" ")})`
@@ -478,6 +472,11 @@ export const native = {
           : args[0]
     }
   },
+  Array: {
+    "Coll/conj": (arr, item) => [...arr, item],
+    "Coll/count": (arr) => arr.length,
+    "Coll/seq": (arr) => new ArraySeq(arr, 0),
+  },
   ArraySeq,
   assoc: (map, ...xs) => {
     const result = { ...map }
@@ -516,59 +515,23 @@ export const native = {
   log: console.log,
   max: (...xs) => Math.max(...xs),
   not: (x) => x === false || x === null,
-  Null,
+  Object: {
+    "Coll/conj": (obj, item) => ({ ...obj, [item[0]]: item[1] }),
+    "Coll/count": (obj) => Object.keys(obj).length,
+    "Coll/seq": (obj) => new ArraySeq(Object.entries(obj), 0),
+  },
   resolve,
   "ROUND*": (n, x) => Math.round(x * 10 ** n) / 10 ** n,
   slice: (arr, start) => arr.slice(start),
+  String: {
+    "Coll/conj": (s, item) => s + item,
+    "Coll/count": (s) => s.length,
+    "Coll/seq": (s) => new ArraySeq(s.split(""), 0),
+  },
   string: (x) => (typeof x === "symbol" ? Sn(x) : ""),
   "symbol?": (x) => typeof x === "symbol",
   toFn,
   "upper-case": (s) => s.toUpperCase(),
-
-  // (defprotocol Coll (conj [item]) (count []) (seq []))
-  conj: (coll, item) => {
-    if (typeof coll === "string") {
-      return coll + item
-    }
-
-    if (Array.isArray(coll)) {
-      return [...coll, item]
-    }
-
-    if (coll?.constructor === Object) {
-      return {
-        ...coll,
-        [item[0]]: item[1],
-      }
-    }
-
-    return invoke(coll, S("Coll"), S("conj"), [item])
-  },
-  count: (coll) => {
-    if (typeof coll === "string" || Array.isArray(coll)) {
-      return coll.length
-    }
-
-    if (coll?.constructor === Object) {
-      return Object.keys(coll).length
-    }
-
-    return invoke(coll, S("Coll"), S("count"), [])
-  },
-  seq: (coll) => {
-    if (typeof coll === "string") {
-      return $["ArraySeq"](coll.split(""), 0)
-    }
-
-    if (Array.isArray(coll)) {
-      return coll.length ? ArraySeq(coll, 0) : null
-    }
-    if (coll?.constructor === Object) {
-      return ArraySeq(Object.entries(coll), 0)
-    }
-
-    return invoke(coll, S("Coll"), S("seq"), [])
-  },
 
   tap: (x) => console.log("tap", x) || x,
 }

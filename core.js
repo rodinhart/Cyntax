@@ -52,8 +52,16 @@ export default lisp(native)`
     map
     (get-in (map (keys 0)) (slice keys 1))))
 
+;; types
+(deftype Nil [])
+
 ;; collections
-(extend Null Coll
+(defprotocol Coll
+  (conj [item])
+  (count [])
+  (seq []))
+
+(extend Nil Coll
   (conj [item] (cons item nil))
   (count [] 0)
   (seq [] nil))

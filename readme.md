@@ -81,6 +81,7 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 - review native functions (specially invoke, resolve, toFn)
 - allow spaces in strings
 - and#
+- use x.constructor.name ?? Nil everywhere?
 
 ## Dispatch table
 

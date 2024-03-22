@@ -1,6 +1,7 @@
 import cyntax from "./cyntax.js"
 import { prn } from "./lisp.js"
 import pql from "./pql.js"
+// import pql from "./test.js"
 
 const result = pql.result
 
@@ -23,4 +24,4 @@ if (result?.self?.data) {
   `
 }
 
-window.c = (t) => prn(cyntax({})([`(def __ ${t})`]).__)
+window.c = (t) => prn(cyntax(pql)([`(def __ ${t})`]).__)

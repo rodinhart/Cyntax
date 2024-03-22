@@ -124,11 +124,10 @@ export const genCode = withType({
     const [op, ...rands] = [...exp]
 
     if (op === S("def")) {
-      const [name, val] = rands
+      const [n, val] = rands
+      const name = JSON.stringify(Sn(n))
 
-      return `($[${JSON.stringify(Sn(name))}] = ${genCode(
-        val ?? null
-      )},Symbol.for(${JSON.stringify(Sn(name))}))`
+      return `($[${name}] = ${genCode(val ?? null)},Symbol.for(${name}))`
     }
 
     if (op === S("defprotocol")) {
@@ -154,6 +153,7 @@ export const genCode = withType({
       const [name, params] = rands
 
       // only works with javascript compatible names
+      // could make them pojos?  const ArraySeq = (arr, i) => ({ ArraySeq: {arr, i} })
       return `($[${JSON.stringify(Sn(name))}] = function ${Sn(name)}(${params
         .map(Sn)
         .join(",")}) {
@@ -495,7 +495,6 @@ export const native = {
   },
   car: (exp) => exp.car,
   cdr: (exp) => exp.cdr,
-
   cons,
   "contains?": (map, ...keys) => keys.every((key) => key in map),
   dissoc: (map, ...keys) => {

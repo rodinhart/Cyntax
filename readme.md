@@ -78,7 +78,6 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 - make macro a fn with meta data
 - destructering
 - ffi
-- review native functions (specially invoke, resolve, toFn)
 - allow spaces in strings - proper lexer
 - and#
 - use x.constructor.name ?? Nil everywhere?

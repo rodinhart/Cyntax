@@ -3,11 +3,11 @@ import { lisp, native } from "./lisp.js"
 export default lisp(native)`
 
 ;; lang
-(def defn (macro [name & forms]
-  '(def ~name (fn ~@forms))))
-
 (def defmacro (macro [name & forms]
   '(def ~name (macro ~@forms))))
+
+(defmacro defn [name & forms]
+  '(def ~name (fn ~@forms)))
 
 (defmacro ->
   ([x] x)
@@ -33,7 +33,7 @@ export default lisp(native)`
     (assoc map (keys 0) (assoc-in (map (keys 0)) (slice keys 1) val))))
 
 (defn comp [g f]
-  (fn [x] (g (f x)))) ; allow multiple args
+  (fn [x] (g (f x)))) ; TODO allow multiple args
 
 (defmacro cond
   ([] nil)
@@ -58,6 +58,8 @@ export default lisp(native)`
 ;; types
 (deftype Nil [])
 
+(deftype LazyCons [car cdr])
+
 ;; collections
 (defprotocol Coll
   (conj [item])
@@ -74,6 +76,11 @@ export default lisp(native)`
   (count [] (+ 1 (if cdr (count cdr) 0)))
   (seq [] (List car cdr)))
 
+(extend LazyCons Coll
+  (conj [item] (lazy-cons item (LazyCons car cdr)))
+  (count [] (+ 1 (let [_ (cdr)] (if _ (count _) 0))))
+  (seq [] (LazyCons car cdr)))
+
 ;; sequences
 (defprotocol Seq
   (first [])
@@ -86,13 +93,6 @@ export default lisp(native)`
 (extend ArraySeq Seq
   (first [] (arr i))
   (rest [] (if (< (+ i 1) (count arr)) (ArraySeq arr (+ i 1)) nil)))
-
-(deftype LazyCons [car cdr])
-
-(extend LazyCons Coll
-  (conj [item] (lazy-cons item (LazyCons car cdr)))
-  (count [] (+ 1 (if (cdr) (count (cdr)) 0))) ; use let
-  (seq [] (LazyCons car cdr)))
 
 (extend LazyCons Seq
   (first [] car)

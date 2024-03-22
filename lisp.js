@@ -11,6 +11,7 @@ function List(car, cdr) {
   this.cdr = cdr
 }
 List.params = [S("car"), S("cdr")]
+
 List.prototype[Symbol.iterator] = function* () {
   let c = this
   while (c) {
@@ -312,7 +313,7 @@ export const macroExpand = ($) =>
     List: (exp) => {
       const [op, ...rands] = exp
       if (typeof op === "symbol" && $[Sn(op)]?.macro === true) {
-        return macroExpand($)(toFn($[Sn(op)])(...rands))
+        return macroExpand($)($[Sn(op)](...rands))
       }
 
       if (op === S("quote")) {
@@ -457,21 +458,6 @@ export const native = {
   "<": (a, b) => a < b,
   ">": (a, b) => a > b,
 
-  // define macro in core?
-  and2: (...args) => {
-    switch (args.length) {
-      case 0:
-        return true
-
-      case 1:
-        return args[0]
-
-      default:
-        return args[0] !== false && args[0] !== null
-          ? native.and(...args.slice(1))
-          : args[0]
-    }
-  },
   Array: {
     "Coll/conj": (arr, item) => [...arr, item],
     "Coll/count": (arr) => arr.length,
@@ -489,11 +475,6 @@ export const native = {
   car: (exp) => exp.car,
   cdr: (exp) => exp.cdr,
 
-  // define as macro in core?
-  comp:
-    (g, f) =>
-    (...args) =>
-      toFn(g)(toFn(f)(...args)),
   cons,
   "contains?": (map, ...keys) => keys.every((key) => key in map),
   dissoc: (map, ...keys) => {
@@ -532,8 +513,6 @@ export const native = {
   "symbol?": (x) => typeof x === "symbol",
   toFn,
   "upper-case": (s) => s.toUpperCase(),
-
-  tap: (x) => console.log("tap", x) || x,
 }
 
 const debug = (...args) => {

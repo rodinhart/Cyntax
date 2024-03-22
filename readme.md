@@ -79,7 +79,7 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 - destructering
 - ffi
 - review native functions (specially invoke, resolve, toFn)
-- allow spaces in strings
+- allow spaces in strings - proper lexer
 - and#
 - use x.constructor.name ?? Nil everywhere?
 

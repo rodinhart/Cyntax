@@ -32,6 +32,9 @@ export default lisp(native)`
     val
     (assoc map (keys 0) (assoc-in (map (keys 0)) (slice keys 1) val))))
 
+(defn comp [g f]
+  (fn [x] (g (f x)))) ; allow multiple args
+
 (defmacro cond
   ([] nil)
   ([test expr & rest] '(if ~test ~expr (cond ~@rest))))

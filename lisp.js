@@ -10,7 +10,12 @@ function List(car, cdr) {
   this.car = car
   this.cdr = cdr
 }
-List.params = [S("car"), S("cdr")]
+List.prototype.toPojo = function () {
+  return {
+    car: this.car,
+    cdr: this.cdr,
+  }
+}
 
 List.prototype[Symbol.iterator] = function* () {
   let c = this
@@ -29,7 +34,12 @@ function ArraySeq(arr, i) {
   this.arr = arr
   this.i = i
 }
-ArraySeq.params = [S("arr"), S("i")]
+ArraySeq.prototype.toPojo = function () {
+  return {
+    arr: this.arr,
+    i: this.i,
+  }
+}
 
 const getType = (exp) =>
   exp === null
@@ -55,7 +65,6 @@ const getType = (exp) =>
 const list = (...xs) => [...xs].reverse().reduce((r, x) => cons(x, r), null)
 
 // Runtime helpers
-// move to core? nothing here that is js specific?
 const invoke = (type, protocol, method, obj, args) => {
   try {
     return type[`${Sn(protocol)}/${Sn(method)}`](obj, ...args)
@@ -73,20 +82,37 @@ const resolve = ($, name) => {
   return $[name]
 }
 
-// check for array and pojo
-const toFn = (op) => (typeof op === "function" ? op : (ix) => op[ix] ?? "FUBAR")
+const toFn = (op) => {
+  if (typeof op === "function") {
+    return op
+  }
+
+  if (Array.isArray(op)) {
+    return (ix) => {
+      if (!Number.isInteger(ix)) {
+        throw new Error(`Expected integer array index but found ${ix}`)
+      }
+
+      return op[ix < 0 ? op.length + ix : ix]
+    }
+  }
+
+  if (op?.constructor === Object) {
+    return (key) => op[key]
+  }
+
+  throw new Error(`Expected callable but found ${op}`)
+}
 
 // Compiler
-const withType =
-  (dispatch) =>
-  (exp, ...rest) => {
-    const type = getType(exp)
-    if (!(type in dispatch)) {
-      throw new Error(`Unknown dispatch for ${type}`)
-    }
-
-    return dispatch[type](exp, ...rest)
+const withType = (dispatch) => (exp) => {
+  const type = getType(exp)
+  if (!(type in dispatch)) {
+    throw new Error(`Unknown dispatch for ${type}`)
   }
+
+  return dispatch[type](exp)
+}
 
 export const genCode = withType({
   null: (exp) => "null",
@@ -94,7 +120,7 @@ export const genCode = withType({
   symbol: (exp) => `$.resolve($, ${JSON.stringify(Sn(exp))})`,
   number: (exp) => String(exp),
   string: (exp) => JSON.stringify(exp),
-  List: (exp, $) => {
+  List: (exp) => {
     const [op, ...rands] = [...exp]
 
     if (op === S("def")) {
@@ -135,20 +161,15 @@ export const genCode = withType({
         .map(Sn)
         .join(", ")})
         ${params.map((param) => `this.${Sn(param)} = ${Sn(param)}`).join("\n")}
-      }, $[${JSON.stringify(Sn(name))}].params = ${genCode(
-        cons(S("quote"), cons(params, null))
-      )}, Symbol.for(${JSON.stringify(Sn(name))}))`
+      }, $[${JSON.stringify(Sn(name))}].prototype.toPojo = function() {
+        return {${params
+          .map((param) => `${Sn(param)}: this.${Sn(param)}`)
+          .join(",")}}
+      }, Symbol.for(${JSON.stringify(Sn(name))}))`
     }
 
     if (op === S("extend")) {
       const [typeName, protocol, ...methods] = rands
-
-      const type = resolve($, Sn(typeName))
-
-      const typeParams = [...type.params].map(
-        (param) =>
-          `,${JSON.stringify(Sn(param))}: obj[${JSON.stringify(Sn(param))}]`
-      )
 
       const addMethods = methods.map((method) => {
         const [name, p, b] = [...method]
@@ -160,7 +181,7 @@ export const genCode = withType({
         const body = genCode(b)
 
         return `${genCode(typeName)}[${namespaced}] = (obj, ...args) => {
-          return (($) => ${body})({...$${typeParams.join("")}${params.join(
+          return (($) => ${body})({...$,...(obj?.toPojo?.()??{})${params.join(
           ""
         )}})
         }`
@@ -526,7 +547,6 @@ export const lisp =
     debug("code", prn(code))
 
     const $2 = { ...$ }
-
     code.forEach((form) => {
       debug("---")
       debug("form", prn(form))
@@ -534,7 +554,7 @@ export const lisp =
       const expanded = macroExpand($2)(form)
       debug("expanded", prn(expanded))
 
-      const javascript = genCode(expanded, $2)
+      const javascript = genCode(expanded)
       debug("javascript", javascript)
 
       const compiled = eval(`(($) => ${javascript})`)

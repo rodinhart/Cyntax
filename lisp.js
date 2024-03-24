@@ -1,14 +1,8 @@
 // Type system
 
-// (defprotocol Type
-//   (name [])
-//   (invoke [protocol method args]))
-// const name = (type) => type?.constructor?.name ?? "Nil"
-
 // (deftype Symbol [name])
 const symbol = (name) => Symbol.for(name)
-// name? a la Clojure
-const Sn = (symbol) => Symbol.keyFor(symbol) // (get sym "name") ?? i.e. how to get fields
+const name = (symbol) => Symbol.keyFor(symbol)
 
 // (deftype List [car cdr])
 function List(car, cdr) {
@@ -32,8 +26,8 @@ List.prototype[Symbol.iterator] = function* () {
   }
 }
 
-const cons = (car, cdr) => new List(car, cdr)
-const list = (...xs) => [...xs].reverse().reduce((r, x) => cons(x, r), null)
+const cons = (car, cdr) => List(car, cdr)
+const list = (...xs) => [...xs].reverse().reduce((r, x) => List(x, r), null)
 
 // (deftype ArraySeq [arr i])
 function ArraySeq(arr, i) {
@@ -91,12 +85,12 @@ const toFn = (op) => {
         throw new Error(`Expected integer array index but found ${ix}`)
       }
 
-      return op[ix < 0 ? op.length + ix : ix]
+      return op[ix < 0 ? op.length + ix : ix] ?? null
     }
   }
 
   if (op?.constructor === Object) {
-    return (key) => op[key]
+    return (key) => op[key] ?? null
   }
 
   throw new Error(`Expected callable but found ${op}`)
@@ -115,7 +109,7 @@ const withType = (dispatch) => (exp) => {
 export const genCode = withType({
   null: (exp) => "null",
   boolean: (exp) => String(exp),
-  symbol: (exp) => `$.resolve($, ${JSON.stringify(Sn(exp))})`,
+  symbol: (exp) => `$.resolve($, ${JSON.stringify(name(exp))})`,
   number: (exp) => String(exp),
   string: (exp) => JSON.stringify(exp),
   List: (exp) => {
@@ -123,22 +117,22 @@ export const genCode = withType({
 
     if (op === symbol("def")) {
       const [n, val] = rands
-      const targetName = JSON.stringify(Sn(n))
+      const symbolName = JSON.stringify(name(n))
 
-      return `($[${targetName}] = ${genCode(
+      return `($[${symbolName}] = ${genCode(
         val ?? null
-      )},Symbol.for(${targetName}))`
+      )}, Symbol.for(${symbolName}))`
     }
 
     if (op === symbol("defprotocol")) {
       const [pn, ...fns] = rands
-      const protocolName = Sn(pn)
+      const protocolName = name(pn)
 
       const compiledMethods = fns.map((fn) => {
         const [mn, ps] = fn
-        const methodName = Sn(mn)
+        const methodName = name(mn)
         const params = ps.map(
-          (param, i) => `[${JSON.stringify(Sn(param))}]: args[${i}] ?? null`
+          (param, i) => `[${JSON.stringify(name(param))}]: args[${i}] ?? null`
         )
 
         return `$[${JSON.stringify(methodName)}] = (obj, ...args) => {
@@ -151,68 +145,60 @@ export const genCode = withType({
             args: {${params.join(",")}}
           })
         }`
-
-        return `$[${JSON.stringify(
-          methodName
-        )}]=(obj, ...args) => $.invoke($[obj?.constructor?.name ?? "Nil"] ?? obj, Symbol.for(${protocolName}), Symbol.for(${JSON.stringify(
-          Sn(mn)
-        )}), obj, args)`
       })
 
       // use compile (quote name)
-      return `(${compiledMethods.join(",")},Symbol.for(${JSON.stringify(
+      return `(${compiledMethods.join(",")}, Symbol.for(${JSON.stringify(
         protocolName
       )}))`
     }
 
     if (op === symbol("deftype")) {
-      const [typeName, params] = rands
+      const [tn, params] = rands
+
+      const typeName = name(tn)
 
       // only works with javascript compatible names
       // could make them pojos?  const ArraySeq = (arr, i) => ({ ArraySeq: {arr, i} })
-      return `($[${JSON.stringify(Sn(typeName))}] = function ${Sn(
-        typeName
-      )}(${params.map(Sn).join(",")}) {
-        if (!(this instanceof ${Sn(typeName)})) return new ${Sn(
-        typeName
-      )}(${params.map(Sn).join(", ")})
-        ${params.map((param) => `this.${Sn(param)} = ${Sn(param)}`).join("\n")}
+      return `($[${JSON.stringify(typeName)}] = function ${typeName}(${params
+        .map(name)
+        .join(",")}) {
+        if (!(this instanceof ${name(tn)})) return new ${typeName}(${params
+        .map(name)
+        .join(", ")})
+        ${params
+          .map((param) => `this.${name(param)} = ${name(param)}`)
+          .join("\n")}
       }, $[${JSON.stringify(
-        Sn(typeName)
+        typeName
       )}]["Type/invoke"] = ({obj, method, args, ...$}) =>
          method({
           ...$
           ${params
             .map(
               (param) =>
-                `, [${JSON.stringify(Sn(param))}]: obj[${JSON.stringify(
-                  Sn(param)
+                `, [${JSON.stringify(name(param))}]: obj[${JSON.stringify(
+                  name(param)
                 )}]`
             )
             .join("")}
-            ,...args
-         }), Symbol.for(${JSON.stringify(Sn(typeName))}))`
+            , ...args
+         }), Symbol.for(${JSON.stringify(typeName)}))`
     }
 
     if (op === symbol("extend")) {
       const [typeName, protocol, ...methods] = rands
 
       const addMethods = methods.map((method) => {
-        const [methodName, p, b] = [...method]
+        const [methodName, p, b] = [...method] // p must match protocol !?!
 
-        const namespaced = JSON.stringify(`${Sn(protocol)}/${Sn(methodName)}`)
-        const params = p.map(
-          (param, i) => `,${JSON.stringify(Sn(param))}: args[${i}] ?? null`
+        const namespaced = JSON.stringify(
+          `${name(protocol)}/${name(methodName)}`
         )
+
         const body = genCode(b)
 
         return `${genCode(typeName)}[${namespaced}] = ($) => ${body}`
-
-        return `${genCode(typeName)}[${namespaced}] = (obj, ...args) => {
-          return (($) => ${body})({...$,...(obj?.toPojo?.()??{})${params.join(
-          ""
-        )}})
-        }`
       })
 
       return `(
@@ -235,9 +221,9 @@ export const genCode = withType({
           const args = []
           for (let i = 0; i < p.length; i++) {
             if (p[i] !== symbol("&")) {
-              args.push(`,${JSON.stringify(Sn(p[i]))}:args[${i}]`)
+              args.push(`,${JSON.stringify(name(p[i]))}:args[${i}]`)
             } else {
-              args.push(`,${JSON.stringify(Sn(p[i + 1]))}:args.slice(${i})`)
+              args.push(`,${JSON.stringify(name(p[i + 1]))}:args.slice(${i})`)
               i++
             }
           }
@@ -281,7 +267,7 @@ export const genCode = withType({
         ${pairs
           .map(
             ([letName, exp]) =>
-              `$[${JSON.stringify(Sn(letName))}] = ${genCode(exp)}`
+              `$[${JSON.stringify(name(letName))}] = ${genCode(exp)}`
           )
           .join(",")},
         ${genCode(body)}
@@ -302,7 +288,7 @@ export const genCode = withType({
           ${pairs
             .map(
               ([loopName], i) =>
-                `$[${JSON.stringify(Sn(loopName))}] = args[${i}]`
+                `$[${JSON.stringify(name(loopName))}] = args[${i}]`
             )
             .join("\n")}
 
@@ -328,7 +314,7 @@ export const genCode = withType({
       const quote = withType({
         null: (exp) => "null",
         boolean: (exp) => String(exp),
-        symbol: (exp) => `Symbol.for(${JSON.stringify(Sn(exp))})`,
+        symbol: (exp) => `Symbol.for(${JSON.stringify(name(exp))})`,
         number: (exp) => String(exp),
         string: (exp) => JSON.stringify(exp),
         List: (exp) => {
@@ -367,8 +353,8 @@ export const macroExpand = ($) =>
     string: (exp) => exp,
     List: (exp) => {
       const [op, ...rands] = exp
-      if (typeof op === "symbol" && $[Sn(op)]?.macro === true) {
-        return macroExpand($)($[Sn(op)](...rands))
+      if (typeof op === "symbol" && $[name(op)]?.macro === true) {
+        return macroExpand($)($[name(op)](...rands))
       }
 
       if (op === symbol("quote")) {
@@ -389,7 +375,7 @@ export const macroExpand = ($) =>
 export const prn = withType({
   null: (exp) => "nil",
   boolean: (exp) => String(exp),
-  symbol: (exp) => Sn(exp),
+  symbol: (exp) => name(exp),
   number: (exp) => String(exp),
   string: (exp) => JSON.stringify(exp),
   List: (exp) => `(${[...exp].map((x) => prn(x)).join(" ")})`,
@@ -566,7 +552,7 @@ export const native = {
     "Coll/count": (s) => s.length,
     "Coll/seq": (s) => new ArraySeq(s.split(""), 0),
   },
-  string: (x) => (typeof x === "symbol" ? Sn(x) : ""),
+  string: (x) => (typeof x === "symbol" ? name(x) : ""),
   "symbol?": (x) => typeof x === "symbol",
   toFn,
   "upper-case": (s) => s.toUpperCase(),

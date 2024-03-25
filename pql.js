@@ -162,4 +162,6 @@ export default cyntax({})`
   )
 ) { "data" data }))
 
+(def result ['div { "color" "red" } "HelloWorld"])
+
 `

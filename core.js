@@ -49,7 +49,11 @@ export default lisp(native)`
 
 (defn identity [x] x)
 
+(defn inc [x] (+ x 1))
+
 (defn not= [lhs rhs] (not (= lhs rhs)))
+
+(defn odd? [x] (= (% x 2) 1))
 
 (defn update [map key f x]
   (assoc map key (f (map key) x)))
@@ -63,6 +67,8 @@ export default lisp(native)`
       (recur (r (keys i)) (+ i 1))
       r)))
 
+(defmacro test [form expected]
+  '(test* (quote ~form) ~form ~expected))
 
 ;; types
 (deftype Nil [])
@@ -88,6 +94,11 @@ export default lisp(native)`
   (conj [item] (cons item (cons car cdr)))
   (count [] (+ 1 (if cdr (count cdr) 0)))
   (seq [] (List car cdr)))
+
+(extend ArraySeq Coll
+  (conj [item] (ArraySeq (conj arr item) i))
+  (count [] (count arr))
+  (seq [] (ArraySeq arr i)))
 
 (extend LazyCons Coll
   (conj [item] (lazy-cons item (LazyCons car cdr)))

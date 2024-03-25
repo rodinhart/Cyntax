@@ -36,6 +36,45 @@ ArraySeq["Type/invoke"] = ($, method, obj, args) =>
   method({ ...$, arr: obj.arr, i: obj.i, ...args })
 
 // Runtime helpers
+const eqal = (a, b) => {
+  const ta = a?.constructor?.name ?? "Nil"
+  const tb = b?.constructor?.name ?? "Nil"
+
+  if (ta !== tb) {
+    return false
+  }
+
+  if (typeof a !== "object" && a === b) {
+    return true
+  }
+
+  if (a === null && b === null) {
+    return true
+  }
+
+  if (ta === "Object") {
+    if (Object.keys(a).length !== Object.keys(b).length) {
+      return false
+    }
+
+    return Object.entries(a).every(([key, val]) => eqal(val, b[key]))
+  }
+
+  if (ta === "Array") {
+    if (a.length !== b.length) {
+      return false
+    }
+
+    return a.every((x, i) => eqal(x, b[i]))
+  }
+
+  if (ta === "List") {
+    return eqal([...a], [...b])
+  }
+
+  return false
+}
+
 const resolve = ($, name) => {
   if (!(name in $)) {
     throw Error(`Symbol ${name} is not defined`)
@@ -127,9 +166,17 @@ export const genCode = withType({
         const [mn] = fn
         const methodName = name(mn)
 
-        return `$[${JSON.stringify(
-          methodName
-        )}] = (obj, ...args) => $[obj?.constructor?.name ?? "Nil"]["${protocolName}/${methodName}"](obj, ...args)`
+        return `$[${JSON.stringify(methodName)}] = (obj, ...args) => {
+          const name = obj?.constructor?.name ?? "Nil"
+          const type = $.resolve($, name)
+          const fn = type["${protocolName}/${methodName}"] 
+          
+          if (typeof fn !== "function") {
+            throw new Error(\`Type \${name} is missing implementation for ${protocolName}/${methodName}\`)
+          }
+          
+          return fn(obj, ...args)
+        }`
       })
 
       return `(${compiledMethods.join(",")}, Symbol.for(${JSON.stringify(
@@ -488,12 +535,19 @@ export const read = (input) => {
 
 // native operations
 export const native = {
-  "+": (...xs) => xs.reduce((r, x) => r + x, 0),
+  "+": (...xs) =>
+    xs.reduce((r, x) => {
+      if (!Number.isFinite(x)) {
+        throw new Error(`+ expected number but found ${prn(x)}`)
+      }
+
+      return r + x
+    }, 0),
   "-": (a, b) => a - b,
   "*": (...xs) => xs.reduce((r, x) => r * x, 1),
   "/": (a, b) => a / b,
   "%": (a, b) => a % b,
-  "=": (a, b) => a === b, // need eqal
+  "=": (a, b) => eqal(a, b),
   "<": (a, b) => a < b,
   ">": (a, b) => a > b,
 
@@ -504,7 +558,7 @@ export const native = {
     // (extend Array Coll ...)
     "Coll/conj": (arr, item) => [...arr, item],
     "Coll/count": (arr) => arr.length,
-    "Coll/seq": (arr) => new ArraySeq(arr, 0),
+    "Coll/seq": (arr) => ArraySeq(arr, 0),
   },
   ArraySeq,
   assoc: (map, ...xs) => {
@@ -543,7 +597,7 @@ export const native = {
     // (extend Object Coll ...)
     "Coll/conj": (obj, item) => ({ ...obj, [item[0]]: item[1] }),
     "Coll/count": (obj) => Object.keys(obj).length,
-    "Coll/seq": (obj) => new ArraySeq(Object.entries(obj), 0),
+    "Coll/seq": (obj) => ArraySeq(Object.entries(obj), 0),
   },
   resolve,
   "ROUND*": (n, x) => Math.round(x * 10 ** n) / 10 ** n,
@@ -558,8 +612,18 @@ export const native = {
   },
   string: (x) => (typeof x === "symbol" ? name(x) : ""),
   "symbol?": (x) => typeof x === "symbol",
+  "test*": (description, actual, expected) => {
+    if (!native["="](actual, expected)) {
+      throw new Error(
+        `Test ${prn(description)} failed: expected ${prn(
+          expected
+        )} but found ${prn(actual)}.`
+      )
+    }
+  },
   toFn,
   "upper-case": (s) => s.toUpperCase(),
+  vector: (...coll) => coll,
 }
 
 const debug = (...args) => {

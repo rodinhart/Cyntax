@@ -11,13 +11,8 @@ function List(car, cdr) {
   this.car = car
   this.cdr = cdr
 }
-List["Type/invoke"] = ({ obj, method, args, ...$ }) =>
-  method({
-    ...$,
-    car: obj.car,
-    cdr: obj.cdr,
-    ...args,
-  })
+List["Type/invoke"] = ($, method, obj, args) =>
+  method({ ...$, car: obj.car, cdr: obj.cdr, ...args })
 List.prototype[Symbol.iterator] = function* () {
   let c = this
   while (c) {
@@ -36,13 +31,8 @@ function ArraySeq(arr, i) {
   this.arr = arr
   this.i = i
 }
-ArraySeq["Type/invoke"] = ({ obj, method, args, ...$ }) =>
-  method({
-    ...$,
-    arr: obj.arr,
-    i: obj.i,
-    ...args,
-  })
+ArraySeq["Type/invoke"] = ($, method, obj, args) =>
+  method({ ...$, arr: obj.arr, i: obj.i, ...args })
 
 const getType = (exp) =>
   exp === null
@@ -129,21 +119,13 @@ export const genCode = withType({
       const protocolName = name(pn)
 
       const compiledMethods = fns.map((fn) => {
-        const [mn, ps] = fn
+        const [mn] = fn
         const methodName = name(mn)
-        const params = ps.map(
-          (param, i) => `[${JSON.stringify(name(param))}]: args[${i}] ?? null`
-        )
 
         return `$[${JSON.stringify(methodName)}] = (obj, ...args) => {
           const type = $[obj?.constructor?.name ?? "Nil"]
 
-          return type["Type/invoke"]({
-            ...$,
-            method: type["${protocolName}/${methodName}"],
-            obj,
-            args: {${params.join(",")}}
-          })
+          return type["${protocolName}/${methodName}"](obj, ...args)
         }`
       })
 
@@ -171,7 +153,7 @@ export const genCode = withType({
           .join("\n")}
       }, $[${JSON.stringify(
         typeName
-      )}]["Type/invoke"] = ({obj, method, args, ...$}) =>
+      )}]["Type/invoke"] = ($, method, obj, args) =>
          method({
           ...$
           ${params
@@ -182,15 +164,16 @@ export const genCode = withType({
                 )}]`
             )
             .join("")}
-            , ...args
-         }), Symbol.for(${JSON.stringify(typeName)}))`
+          , ...args}), Symbol.for(${JSON.stringify(typeName)}))`
     }
 
     if (op === symbol("extend")) {
       const [typeName, protocol, ...methods] = rands
 
+      const type = genCode(typeName)
+
       const addMethods = methods.map((method) => {
-        const [methodName, p, b] = [...method] // p must match protocol !?!
+        const [methodName, p, b] = [...method]
 
         const namespaced = JSON.stringify(
           `${name(protocol)}/${name(methodName)}`
@@ -198,7 +181,16 @@ export const genCode = withType({
 
         const body = genCode(b)
 
-        return `${genCode(typeName)}[${namespaced}] = ($) => ${body}`
+        return `${type}[${namespaced}] = (obj, ...args) => ${type}["Type/invoke"](
+          $,
+          ($) => ${body},
+          obj,
+          {${p
+            .map(
+              (param, i) =>
+                `[${JSON.stringify(name(param))}]: args[${i}] ?? null`
+            )
+            .join(",")}})`
       })
 
       return `(
@@ -500,11 +492,11 @@ export const native = {
   ">": (a, b) => a > b,
 
   Array: {
-    "Type/invoke": ({ obj, method, args, ...$ }) =>
+    "Type/invoke": ($, method, obj, args) =>
       method({ ...$, arr: obj, ...args }),
-    "Coll/conj": ({ arr, item }) => [...arr, item],
-    "Coll/count": ({ arr }) => arr.length,
-    "Coll/seq": ({ arr }) => new ArraySeq(arr, 0),
+    "Coll/conj": (arr, item) => [...arr, item],
+    "Coll/count": (arr) => arr.length,
+    "Coll/seq": (arr) => new ArraySeq(arr, 0),
   },
   ArraySeq,
   assoc: (map, ...xs) => {
@@ -538,16 +530,16 @@ export const native = {
   max: (...xs) => Math.max(...xs),
   not: (x) => x === false || x === null,
   Object: {
-    "Type/invoke": ({ obj, method, args, ...$ }) =>
-      method({ ...$, obj, ...args }),
-    "Coll/conj": ({ obj, item }) => ({ ...obj, [item[0]]: item[1] }),
-    "Coll/count": ({ obj }) => Object.keys(obj).length,
-    "Coll/seq": ({ obj }) => new ArraySeq(Object.entries(obj), 0),
+    "Type/invoke": ($, method, obj, args) => method({ ...$, obj, ...args }),
+    "Coll/conj": (obj, item) => ({ ...obj, [item[0]]: item[1] }),
+    "Coll/count": (obj) => Object.keys(obj).length,
+    "Coll/seq": (obj) => new ArraySeq(Object.entries(obj), 0),
   },
   resolve,
   "ROUND*": (n, x) => Math.round(x * 10 ** n) / 10 ** n,
   slice: (arr, start) => arr.slice(start),
   String: {
+    "Type/invoke": ($, method, obj, args) => method({ ...$, s: obj, ...args }),
     "Coll/conj": (s, item) => s + item,
     "Coll/count": (s) => s.length,
     "Coll/seq": (s) => new ArraySeq(s.split(""), 0),

@@ -185,4 +185,5 @@ export default lisp(native)`
         (lazy-cons (first s) (t (- n 1) (rest s)))
         nil))]
     (t n (seq coll))))
+
 `

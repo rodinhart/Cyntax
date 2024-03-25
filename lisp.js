@@ -78,40 +78,33 @@ const toFn = (op) => {
 
 // Compiler
 const withType = (dispatch) => (exp) => {
-  const type =
-    exp === null
-      ? "null"
-      : typeof exp === "boolean"
-      ? "boolean"
-      : typeof exp === "symbol"
-      ? "symbol"
-      : typeof exp === "number"
-      ? "number"
-      : typeof exp === "string"
-      ? "string"
-      : exp instanceof List
-      ? "List"
-      : Array.isArray(exp)
-      ? "Array"
-      : exp?.constructor?.["Seq/first"]
-      ? "Seq"
-      : exp?.constructor === Object || exp?.hashmap
-      ? "Hashmap"
-      : "unknown"
+  const type = exp?.constructor?.name ?? "Nil"
 
-  if (!(type in dispatch)) {
-    throw new Error(`Unknown dispatch for ${type}`)
+  if (type in dispatch) {
+    return dispatch[type](exp)
   }
 
-  return dispatch[type](exp)
+  if (exp?.constructor?.["Seq/first"]) {
+    if ("Seq" in dispatch) {
+      return dispatch["Seq"](exp)
+    }
+
+    throw new Error(`Unknown dispatch for Seq (${type})`)
+  }
+
+  if ("?" in dispatch) {
+    return dispatch["?"](exp)
+  }
+
+  throw new Error(`Unknown dispatch for ${type}`)
 }
 
 export const genCode = withType({
-  null: (exp) => "null",
-  boolean: (exp) => String(exp),
-  symbol: (exp) => `$.resolve($, ${JSON.stringify(name(exp))})`,
-  number: (exp) => String(exp),
-  string: (exp) => JSON.stringify(exp),
+  Nil: (exp) => "null",
+  Boolean: (exp) => String(exp),
+  Symbol: (exp) => `$.resolve($, ${JSON.stringify(name(exp))})`,
+  Number: (exp) => String(exp),
+  String: (exp) => JSON.stringify(exp),
   List: (exp) => {
     const [op, ...rands] = [...exp]
 
@@ -317,11 +310,11 @@ export const genCode = withType({
     if (op === symbol("quote")) {
       // (quote exp)
       const quote = withType({
-        null: (exp) => "null",
-        boolean: (exp) => String(exp),
-        symbol: (exp) => `Symbol.for(${JSON.stringify(name(exp))})`,
-        number: (exp) => String(exp),
-        string: (exp) => JSON.stringify(exp),
+        Nil: (exp) => "null",
+        Boolean: (exp) => String(exp),
+        Symbol: (exp) => `Symbol.for(${JSON.stringify(name(exp))})`,
+        Number: (exp) => String(exp),
+        String: (exp) => JSON.stringify(exp),
         List: (exp) => {
           if (exp.car === symbol("unquote")) {
             return genCode(exp.cdr.car)
@@ -332,7 +325,7 @@ export const genCode = withType({
           return `$["list"](${[...exp].map(quote).join(",")})`
         },
         Array: (exp) => `[${exp.map(quote).join(",")}]`,
-        Hashmap: (exp) => `({ hashmap: ${quote(exp.hashmap)} })`,
+        Object: (exp) => `({ hashmap: ${quote(exp.hashmap)} })`,
       })
 
       return quote(rands[0])
@@ -343,7 +336,7 @@ export const genCode = withType({
       .join(",")})`
   },
   Array: (exp) => `[${exp.map(genCode).join(",")}]`,
-  Hashmap: (exp) =>
+  Object: (exp) =>
     `({ ${exp.hashmap
       .map(([key, val]) => `[${genCode(key)}]: ${genCode(val)}`)
       .join(", ")} })`,
@@ -351,11 +344,11 @@ export const genCode = withType({
 
 export const macroExpand = ($) =>
   withType({
-    null: (exp) => exp,
-    boolean: (exp) => exp,
-    symbol: (exp) => exp,
-    number: (exp) => exp,
-    string: (exp) => exp,
+    Nil: (exp) => exp,
+    Boolean: (exp) => exp,
+    Symbol: (exp) => exp,
+    Number: (exp) => exp,
+    String: (exp) => exp,
     List: (exp) => {
       const [op, ...rands] = exp
       if (typeof op === "symbol" && $[name(op)]?.macro === true) {
@@ -369,7 +362,7 @@ export const macroExpand = ($) =>
       return list(macroExpand($)(op), ...rands.map(macroExpand($)))
     },
     Array: (exp) => exp.map(macroExpand($)),
-    Hashmap: (exp) => ({
+    Object: (exp) => ({
       hashmap: exp.hashmap.map(([key, val]) => [
         macroExpand($)(key),
         macroExpand($)(val),
@@ -378,11 +371,11 @@ export const macroExpand = ($) =>
   })
 
 export const prn = withType({
-  null: (exp) => "nil",
-  boolean: (exp) => String(exp),
-  symbol: (exp) => name(exp),
-  number: (exp) => String(exp),
-  string: (exp) => JSON.stringify(exp),
+  Nil: (exp) => "nil",
+  Boolean: (exp) => String(exp),
+  Symbol: (exp) => name(exp),
+  Number: (exp) => String(exp),
+  String: (exp) => JSON.stringify(exp),
   List: (exp) => `(${[...exp].map((x) => prn(x)).join(" ")})`,
   Array: (exp) => `[${exp.map((x) => prn(x)).join(" ")}]`,
   Seq: (exp) => {
@@ -395,11 +388,11 @@ export const prn = withType({
 
     return `(${r.map(prn).join(" ")})`
   },
-  Hashmap: (exp) =>
+  Object: (exp) =>
     `{ ${(exp.hashmap ?? Object.entries(exp))
       .map(([key, val]) => `${prn(key)} ${prn(val)}`)
       .join(", ")} }`,
-  unknown: (exp) => `[type ${exp?.constructor?.name}]`,
+  "?": (exp) => `[type ${exp?.constructor?.name}]`,
 })
 
 export const read = (input) => {

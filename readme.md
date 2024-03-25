@@ -75,12 +75,9 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 
 ## TODO
 
-- make macro a fn with meta data
 - destructering
-- ffi
 - allow spaces in strings - proper lexer
 - and#
-- use x.constructor.name ?? Nil everywhere?
 
 ## Dispatch table
 

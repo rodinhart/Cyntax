@@ -122,11 +122,9 @@ export const genCode = withType({
         const [mn] = fn
         const methodName = name(mn)
 
-        return `$[${JSON.stringify(methodName)}] = (obj, ...args) => {
-          const type = $[obj?.constructor?.name ?? "Nil"]
-
-          return type["${protocolName}/${methodName}"](obj, ...args)
-        }`
+        return `$[${JSON.stringify(
+          methodName
+        )}] = (obj, ...args) => $[obj?.constructor?.name ?? "Nil"]["${protocolName}/${methodName}"](obj, ...args)`
       })
 
       // use compile (quote name)
@@ -193,10 +191,7 @@ export const genCode = withType({
             .join(",")}})`
       })
 
-      return `(
-        ${addMethods.join(",")}
-        ,null
-      )`
+      return `(${addMethods.join(",")}, null)`
     }
 
     if (op === symbol("fn")) {

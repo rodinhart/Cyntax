@@ -13,6 +13,7 @@ function List(car, cdr) {
 }
 List["Type/invoke"] = ($, method, obj, args) =>
   method({ ...$, car: obj.car, cdr: obj.cdr, ...args })
+
 List.prototype[Symbol.iterator] = function* () {
   let c = this
   while (c) {
@@ -34,27 +35,6 @@ function ArraySeq(arr, i) {
 ArraySeq["Type/invoke"] = ($, method, obj, args) =>
   method({ ...$, arr: obj.arr, i: obj.i, ...args })
 
-const getType = (exp) =>
-  exp === null
-    ? "null"
-    : typeof exp === "boolean"
-    ? "boolean"
-    : typeof exp === "symbol"
-    ? "symbol"
-    : typeof exp === "number"
-    ? "number"
-    : typeof exp === "string"
-    ? "string"
-    : exp instanceof List
-    ? "List"
-    : Array.isArray(exp)
-    ? "Array"
-    : exp?.constructor?.["Seq/first"]
-    ? "Seq"
-    : exp?.constructor === Object || exp?.hashmap
-    ? "Hashmap"
-    : "unknown"
-
 // Runtime helpers
 const resolve = ($, name) => {
   if (!(name in $)) {
@@ -71,6 +51,8 @@ const toFn = (op) => {
 
   if (Array.isArray(op)) {
     return (ix) => {
+      // check arity
+
       if (!Number.isInteger(ix)) {
         throw new Error(`Expected integer array index but found ${ix}`)
       }
@@ -80,15 +62,43 @@ const toFn = (op) => {
   }
 
   if (op?.constructor === Object) {
+    // check arity
+
     return (key) => op[key] ?? null
   }
 
-  throw new Error(`Expected callable but found ${op}`)
+  if (op === null) {
+    // check arity
+
+    return () => null
+  }
+
+  throw new Error(`Expected callable but found ${prn(op)}`)
 }
 
 // Compiler
 const withType = (dispatch) => (exp) => {
-  const type = getType(exp)
+  const type =
+    exp === null
+      ? "null"
+      : typeof exp === "boolean"
+      ? "boolean"
+      : typeof exp === "symbol"
+      ? "symbol"
+      : typeof exp === "number"
+      ? "number"
+      : typeof exp === "string"
+      ? "string"
+      : exp instanceof List
+      ? "List"
+      : Array.isArray(exp)
+      ? "Array"
+      : exp?.constructor?.["Seq/first"]
+      ? "Seq"
+      : exp?.constructor === Object || exp?.hashmap
+      ? "Hashmap"
+      : "unknown"
+
   if (!(type in dispatch)) {
     throw new Error(`Unknown dispatch for ${type}`)
   }
@@ -106,6 +116,7 @@ export const genCode = withType({
     const [op, ...rands] = [...exp]
 
     if (op === symbol("def")) {
+      // (def name val)
       const [n, val] = rands
       const symbolName = JSON.stringify(name(n))
 
@@ -115,6 +126,7 @@ export const genCode = withType({
     }
 
     if (op === symbol("defprotocol")) {
+      // (defprotocol name (method [param param]))
       const [pn, ...fns] = rands
       const protocolName = name(pn)
 
@@ -127,13 +139,13 @@ export const genCode = withType({
         )}] = (obj, ...args) => $[obj?.constructor?.name ?? "Nil"]["${protocolName}/${methodName}"](obj, ...args)`
       })
 
-      // use compile (quote name)
       return `(${compiledMethods.join(",")}, Symbol.for(${JSON.stringify(
         protocolName
       )}))`
     }
 
     if (op === symbol("deftype")) {
+      // (deftype Name [field field])
       const [tn, params] = rands
 
       const typeName = name(tn)
@@ -166,6 +178,7 @@ export const genCode = withType({
     }
 
     if (op === symbol("extend")) {
+      // (extend type protocol (method [param param] body))
       const [typeName, protocol, ...methods] = rands
 
       const type = genCode(typeName)
@@ -195,6 +208,7 @@ export const genCode = withType({
     }
 
     if (op === symbol("fn")) {
+      // (fn [param param] body)
       if (Array.isArray(rands[0])) {
         // (fn [x y] (+ x y))
         return genCode(list(symbol("fn"), exp.cdr))
@@ -236,6 +250,7 @@ export const genCode = withType({
     }
 
     if (op === symbol("if")) {
+      // (if pred cons alt)
       const [pred, cons, alt] = rands
 
       return `((__) => __ !== false && __ !== null ? ${genCode(
@@ -262,6 +277,7 @@ export const genCode = withType({
     }
 
     if (op === symbol("loop")) {
+      // (loop [name val name val] (recur newVal newVal))
       const [bindings, body] = rands
 
       // is there a nicer way?
@@ -292,12 +308,14 @@ export const genCode = withType({
     }
 
     if (op === symbol("macro")) {
+      // (macro [param param] body)
       return `Object.assign(${genCode(
         cons(symbol("fn"), exp.cdr)
       )}, {macro:true})`
     }
 
     if (op === symbol("quote")) {
+      // (quote exp)
       const quote = withType({
         null: (exp) => "null",
         boolean: (exp) => String(exp),
@@ -487,8 +505,10 @@ export const native = {
   ">": (a, b) => a > b,
 
   Array: {
+    // (deftype Array [arr])
     "Type/invoke": ($, method, obj, args) =>
       method({ ...$, arr: obj, ...args }),
+    // (extend Array Coll ...)
     "Coll/conj": (arr, item) => [...arr, item],
     "Coll/count": (arr) => arr.length,
     "Coll/seq": (arr) => new ArraySeq(arr, 0),
@@ -525,7 +545,9 @@ export const native = {
   max: (...xs) => Math.max(...xs),
   not: (x) => x === false || x === null,
   Object: {
+    // (deftype Object [obj])
     "Type/invoke": ($, method, obj, args) => method({ ...$, obj, ...args }),
+    // (extend Object Coll ...)
     "Coll/conj": (obj, item) => ({ ...obj, [item[0]]: item[1] }),
     "Coll/count": (obj) => Object.keys(obj).length,
     "Coll/seq": (obj) => new ArraySeq(Object.entries(obj), 0),
@@ -534,7 +556,9 @@ export const native = {
   "ROUND*": (n, x) => Math.round(x * 10 ** n) / 10 ** n,
   slice: (arr, start) => arr.slice(start),
   String: {
+    // (deftype String [s])
     "Type/invoke": ($, method, obj, args) => method({ ...$, s: obj, ...args }),
+    // (extend String Coll ...)
     "Coll/conj": (s, item) => s + item,
     "Coll/count": (s) => s.length,
     "Coll/seq": (s) => new ArraySeq(s.split(""), 0),

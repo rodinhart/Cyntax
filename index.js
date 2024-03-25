@@ -1,7 +1,6 @@
 import cyntax from "./cyntax.js"
 import { prn } from "./lisp.js"
 import pql from "./pql.js"
-// import pql from "./test.js"
 
 const result = pql.result
 

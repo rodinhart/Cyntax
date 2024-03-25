@@ -32,14 +32,22 @@ export default lisp(native)`
     val
     (assoc map (keys 0) (assoc-in (map (keys 0)) (slice keys 1) val))))
 
-(defn comp [g f]
-  (fn [x] (g (f x)))) ; TODO allow multiple args
+(defn comp
+  ([] identity)
+  ([f] f)
+  ([g f] (fn
+    ([] (g (f)))
+    ([x] (g (f x)))
+    ([x y] (g (f x y)))
+    ([x y z] (g (f x y z))))))
 
 (defmacro cond
   ([] nil)
   ([test expr & rest] '(if ~test ~expr (cond ~@rest))))
 
 (defn constantly [x] (fn [& args] x))
+
+(defn identity [x] x)
 
 (defn not= [lhs rhs] (not (= lhs rhs)))
 
@@ -49,16 +57,21 @@ export default lisp(native)`
 (defn update-in [map keys f x]
   (assoc-in map keys (f (get-in map keys) x)))
 
-;; could use loop?
 (defn get-in [map keys]
-  (if (= (count keys) 0)
-    map
-    (get-in (map (keys 0)) (slice keys 1))))
+  (loop [r map i 0]
+    (if (< i (count keys))
+      (recur (r (keys i)) (+ i 1))
+      r)))
+
 
 ;; types
 (deftype Nil [])
 
 (deftype LazyCons [car cdr])
+
+(defmacro lazy-cons [car cdr]
+  '(LazyCons ~car (fn [] ~cdr)))
+
 
 ;; collections
 (defprotocol Coll
@@ -98,8 +111,6 @@ export default lisp(native)`
   (first [] car)
   (rest [] (cdr)))
 
-(defmacro lazy-cons [car cdr]
-  '(LazyCons ~car (fn [] ~cdr)))
 
 ;; sequence operations
 (defn cycle [coll]
@@ -174,5 +185,4 @@ export default lisp(native)`
         (lazy-cons (first s) (t (- n 1) (rest s)))
         nil))]
     (t n (seq coll))))
-
 `

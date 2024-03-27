@@ -11,8 +11,17 @@ export default lisp(native)`
 
 (defmacro ->
   ([x] x)
-  ([x form] (let [s (seq form)] '(~(first s) ~x ~@(rest s))))
+  ([x form] (if (list? form)
+    '(~(car form) ~x ~@(cdr form))
+    '(~form ~x)))
   ([x form & rest] '(-> (-> ~x ~form) ~@rest)))
+
+(defmacro ->>
+  ([x] x)
+  ([x form] (if (list? form)
+    '(~@form ~x)
+    '(~form ~x)))
+  ([x form & rest] '(->> (->> ~x ~form) ~@rest)))
 
 (defn | [val & pipes]
   (loop [cur val s (seq pipes)]

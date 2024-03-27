@@ -543,7 +543,12 @@ export const native = {
 
       return r + x
     }, 0),
-  "-": (a, b) => a - b,
+  "-": (...xs) =>
+    xs.length === 0
+      ? 0
+      : xs.length === 1
+      ? -xs[0]
+      : xs.slice(1).reduce((r, x) => r - x, xs[0]),
   "*": (...xs) => xs.reduce((r, x) => r * x, 1),
   "/": (a, b) => a / b,
   "%": (a, b) => a % b,

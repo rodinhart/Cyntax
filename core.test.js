@@ -3,7 +3,11 @@ import { lisp, native } from "./lisp.js"
 
 lisp({ ...native, ...core })`
 
-(test (-> 12 (/ 3) (+ 1)) 5)
+(test (-> 12 (/ 3) (- 1)) 3)
+(test (-> 12 (/ 3) -) -4)
+
+(test (->> 12 (/ 48) (- 1)) -3)
+(test (->> 12 (/ 48) -) -4)
 
 (test (| 21 (fn [x] (/ x 3)) (fn [y] (- y 5))) 2)
 

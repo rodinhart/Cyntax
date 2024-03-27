@@ -75,8 +75,6 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 
 ## TODO
 
-- should name just be str ?
-- does | need seq?
 - multi arity in protocol ?
   - (count nil 2) doesn't throw error
   - protocol Blah (foo []) (foo [x]) ?

@@ -591,6 +591,7 @@ export const native = {
   String: {
     // (deftype String [s])
     "Type/invoke": ($, method, obj, args) => method({ ...$, s: obj, ...args }),
+
     // (extend String Coll ...)
     "Coll/conj": (s, item) => s + item,
     "Coll/count": (s) => s.length,

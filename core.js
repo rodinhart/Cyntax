@@ -24,9 +24,9 @@ export default lisp(native)`
   ([x form & rest] '(->> (->> ~x ~form) ~@rest)))
 
 (defn | [val & pipes]
-  (loop [cur val s (seq pipes)]
-    (if s
-      (recur ((first s) cur) (rest s))
+  (loop [cur val i 0]
+    (if (< i (count pipes))
+      (recur ((pipes i) cur) (+ i 1))
       cur)))
 
 (defmacro and

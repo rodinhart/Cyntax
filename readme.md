@@ -75,8 +75,11 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 
 ## TODO
 
-- make toFn protocol
 - should name just be str ?
+- does | need seq?
+- multi arity in protocol ?
+  - (count nil 2) doesn't throw error
+  - protocol Blah (foo []) (foo [x]) ?
 - destructering
 - allow spaces in strings - proper lexer
 - and#

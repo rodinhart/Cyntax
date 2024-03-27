@@ -83,38 +83,6 @@ const resolve = ($, name) => {
   return $[name]
 }
 
-const toFn = (op) => {
-  if (typeof op === "function") {
-    return op
-  }
-
-  if (Array.isArray(op)) {
-    return (ix) => {
-      // check arity
-
-      if (!Number.isInteger(ix)) {
-        throw new Error(`Expected integer array index but found ${ix}`)
-      }
-
-      return op[ix < 0 ? op.length + ix : ix] ?? null
-    }
-  }
-
-  if (op?.constructor === Object) {
-    // check arity
-
-    return (key) => op[key] ?? null
-  }
-
-  if (op === null) {
-    // check arity
-
-    return () => null
-  }
-
-  throw new Error(`Expected callable but found ${prn(op)}`)
-}
-
 // Compiler
 const withType = (dispatch) => (exp) => {
   const type = exp?.constructor?.name ?? "Nil"
@@ -378,9 +346,9 @@ export const genCode = withType({
       return quote(rands[0])
     }
 
-    return `$.toFn(${genCode(op)})(${rands
+    return `$.apply(${genCode(op)}, [${rands
       .map((rand) => genCode(rand))
-      .join(",")})`
+      .join(", ")}])`
   },
   Array: (exp) => `[${exp.map(genCode).join(",")}]`,
   Object: (exp) =>
@@ -556,10 +524,15 @@ export const native = {
   "<": (a, b) => a < b,
   ">": (a, b) => a > b,
 
+  // (defprotocol Fn (apply [op args]))
   Array: {
     // (deftype Array [arr])
     "Type/invoke": ($, method, obj, args) =>
       method({ ...$, arr: obj, ...args }),
+
+    // (extend Array Fn (apply [arr [ix]]))
+    "Fn/apply": (arr, [ix]) => arr[ix], // check arity and type
+
     // (extend Array Coll ...)
     "Coll/conj": (arr, item) => [...arr, item],
     "Coll/count": (arr) => arr.length,
@@ -589,6 +562,10 @@ export const native = {
 
     return result
   },
+  Function: {
+    // (extend Function Fn (apply [fn args]))
+    "Fn/apply": (fn, args) => fn(...args),
+  },
   keys: (map) => Object.keys(map),
   List,
   list,
@@ -599,6 +576,10 @@ export const native = {
   Object: {
     // (deftype Object [obj])
     "Type/invoke": ($, method, obj, args) => method({ ...$, obj, ...args }),
+
+    // (extend Object Fn (apply [obj [key]]))
+    "Fn/apply": (obj, [key]) => obj[key], // check arity
+
     // (extend Object Coll ...)
     "Coll/conj": (obj, item) => ({ ...obj, [item[0]]: item[1] }),
     "Coll/count": (obj) => Object.keys(obj).length,
@@ -626,7 +607,6 @@ export const native = {
       )
     }
   },
-  toFn,
   "upper-case": (s) => s.toUpperCase(),
   vector: (...coll) => coll,
 }

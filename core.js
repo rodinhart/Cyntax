@@ -79,6 +79,7 @@ export default lisp(native)`
 (defmacro test [form expected]
   '(test* (quote ~form) ~form ~expected))
 
+
 ;; types
 (deftype Nil [])
 
@@ -86,6 +87,14 @@ export default lisp(native)`
 
 (defmacro lazy-cons [car cdr]
   '(LazyCons ~car (fn [] ~cdr)))
+
+
+;; Fn
+(defprotocol Fn
+  (apply [args]))
+
+(extend Nil Fn
+  (apply [] nil))
 
 
 ;; collections
@@ -113,6 +122,7 @@ export default lisp(native)`
   (conj [item] (lazy-cons item (LazyCons car cdr)))
   (count [] (+ 1 (let [_ (cdr)] (if _ (count _) 0))))
   (seq [] (LazyCons car cdr)))
+
 
 ;; sequences
 (defprotocol Seq

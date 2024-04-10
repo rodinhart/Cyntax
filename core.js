@@ -195,7 +195,7 @@ export default lisp(native)`
     help (fn [s1 s2]
       (if (and s1 s2)
         (lazy-cons (f (first s1) (first s2)) (help (rest s1) (rest s2)))
-        s1))]
+        nil))]
     (help (seq coll1) (seq coll2)))))
 
 (defn map-array

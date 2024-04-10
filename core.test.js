@@ -82,6 +82,24 @@ lisp({ ...native, ...core })`
 (test
   (into [] (map inc [2 3 5]))
   [3 4 6])
+
+(test
+  (into [] (map + [1 2 4] [8 16]))
+  [9 18])
+
+(test (map-array inc [2 3 5]) [3 4 6])
+
+(test
+  (into [] (range 6))
+  [0 1 2 3 4 5])
+
+(test
+  (into [] (range 2 6))
+  [2 3 4 5])
+
+(test
+  (into [] (take 5 (range 10)))
+  [0 1 2 3 4])
 `
 
 export default core

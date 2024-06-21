@@ -36,7 +36,7 @@ ArraySeq["Type/invoke"] = ($, method, obj, args) =>
   method({ ...$, arr: obj.arr, i: obj.i, ...args })
 
 // Runtime helpers
-const eqal = (a, b) => {
+const egal = (a, b) => {
   const ta = a?.constructor?.name ?? "Nil"
   const tb = b?.constructor?.name ?? "Nil"
 
@@ -57,7 +57,7 @@ const eqal = (a, b) => {
       return false
     }
 
-    return Object.entries(a).every(([key, val]) => eqal(val, b[key]))
+    return Object.entries(a).every(([key, val]) => egal(val, b[key]))
   }
 
   if (ta === "Array") {
@@ -65,11 +65,11 @@ const eqal = (a, b) => {
       return false
     }
 
-    return a.every((x, i) => eqal(x, b[i]))
+    return a.every((x, i) => egal(x, b[i]))
   }
 
   if (ta === "List") {
-    return eqal([...a], [...b])
+    return egal([...a], [...b])
   }
 
   return false
@@ -520,7 +520,7 @@ export const native = {
   "*": (...xs) => xs.reduce((r, x) => r * x, 1),
   "/": (a, b) => a / b,
   "%": (a, b) => a % b,
-  "=": (a, b) => eqal(a, b),
+  "=": (a, b) => egal(a, b),
   "<": (a, b) => a < b,
   ">": (a, b) => a > b,
 

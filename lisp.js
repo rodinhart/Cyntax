@@ -185,6 +185,12 @@ export const genCode = withType({
           , ...args}), Symbol.for(${JSON.stringify(typeName)}))`
     }
 
+    if (op === symbol("eval")) {
+      const [exp] = rands
+
+      return `$["eval*"](${genCode(exp)}, $)`
+    }
+
     if (op === symbol("extend")) {
       // (extend type protocol (method [param param] body))
       const [typeName, protocol, ...methods] = rands
@@ -322,6 +328,12 @@ export const genCode = withType({
       )}, {macro:true})`
     }
 
+    if (op === symbol("macroexpand")) {
+      const [form] = rands
+
+      return `$["macroexpand*"]($, ${genCode(form)})`
+    }
+
     if (op === symbol("quote")) {
       // (quote exp)
       const quote = withType({
@@ -355,6 +367,7 @@ export const genCode = withType({
     `({ ${exp.hashmap
       .map(([key, val]) => `[${genCode(key)}]: ${genCode(val)}`)
       .join(", ")} })`,
+  Set: (exp) => `new Set(${genCode([...exp.values()])})`,
 })
 
 export const macroExpand = ($) =>
@@ -383,6 +396,7 @@ export const macroExpand = ($) =>
         macroExpand($)(val),
       ]),
     }),
+    Set: (exp) => new Set([...exp].map(macroExpand($))),
   })
 
 export const prn = withType({
@@ -407,6 +421,7 @@ export const prn = withType({
     `{ ${(exp.hashmap ?? Object.entries(exp))
       .map(([key, val]) => `${prn(key)} ${prn(val)}`)
       .join(", ")} }`,
+  Set: (exp) => `#{${[...exp].map((x) => prn(x)).join(" ")}}`,
   "?": (exp) => `[type ${exp?.constructor?.name}]`,
 })
 
@@ -489,6 +504,22 @@ export const read = (input) => {
       }
     }
 
+    if (x === "#") {
+      if (xs[0] === "{") {
+        xs.shift()
+        const set = new Set()
+        while (xs.length > 1 && xs[0] !== "}") {
+          set.add(_(xs))
+        }
+
+        if (xs.shift() !== "}") {
+          throw new Error(`Expected closing }`)
+        }
+
+        return set
+      }
+    }
+
     return symbol(x)
   }
 
@@ -531,7 +562,7 @@ export const native = {
       method({ ...$, arr: obj, ...args }),
 
     // (extend Array Fn (apply [arr [ix]]))
-    "Fn/apply": (arr, [ix]) => arr[ix], // check arity and type
+    "Fn/apply": (arr, [ix]) => arr[ix] ?? null, // check arity and type
 
     // (extend Array Coll ...)
     "Coll/conj": (arr, item) => [...arr, item],
@@ -550,7 +581,10 @@ export const native = {
   car: (exp) => exp.car,
   cdr: (exp) => exp.cdr,
   cons,
-  "contains?": (map, ...keys) => keys.every((key) => key in map),
+  "contains?": (coll, ...elements) =>
+    coll instanceof Set
+      ? elements.every((e) => coll.has(e))
+      : elements.every((key) => key in coll),
   dissoc: (map, ...keys) => {
     const set = new Set(keys)
     const result = {}
@@ -562,32 +596,53 @@ export const native = {
 
     return result
   },
+  "eval*": (exp, $) => {
+    const expanded = macroExpand($)(exp)
+    // console.log("expanded", prn(expanded))
+    const javascript = genCode(expanded)
+
+    return eval(`($) => ${javascript}`)($)
+  },
+  // "eval*": (exp, $) => eval(`($) => ${genCode(macroExpand($)(exp))}`)($),
   Function: {
     // (extend Function Fn (apply [fn args]))
     "Fn/apply": (fn, args) => fn(...args),
   },
+  "hashmap?": (x) => x?.constructor?.name === "Object",
   keys: (map) => Object.keys(map),
   List,
   list,
   "list?": (x) => x instanceof List,
   log: console.log,
+  "macroexpand*": ($, form) => macroExpand($)(form),
   max: (...xs) => Math.max(...xs),
+  name,
   not: (x) => x === false || x === null,
   Object: {
     // (deftype Object [obj])
     "Type/invoke": ($, method, obj, args) => method({ ...$, obj, ...args }),
 
     // (extend Object Fn (apply [obj [key]]))
-    "Fn/apply": (obj, [key]) => obj[key], // check arity
+    "Fn/apply": (obj, [key]) =>
+      obj[typeof key == "symbol" ? name(key) : key] ?? null, // check arity
 
     // (extend Object Coll ...)
     "Coll/conj": (obj, item) => ({ ...obj, [item[0]]: item[1] }),
     "Coll/count": (obj) => Object.keys(obj).length,
     "Coll/seq": (obj) => ArraySeq(Object.entries(obj), 0),
   },
+  re: (source, flags) => new RegExp(source, flags),
   resolve,
-  "ROUND*": (n, x) => Math.round(x * 10 ** n) / 10 ** n,
   slice: (arr, start) => arr.slice(start),
+  Set: {
+    // (deftype Set [set])
+    "Type/invoke": ($, method, obj, args) => method({ ...$, obj, ...args }),
+
+    // (extend Set Coll ...)
+    "Coll/conj": (set, item) => new Set([...set, item]),
+    "Coll/count": (set) => set.size,
+    "Coll/seq": (set) => ArraySeq([...set], 0),
+  },
   String: {
     // (deftype String [s])
     "Type/invoke": ($, method, obj, args) => method({ ...$, s: obj, ...args }),
@@ -609,6 +664,7 @@ export const native = {
     }
   },
   "upper-case": (s) => s.toUpperCase(),
+  vals: (map) => Object.values(map),
   vector: (...coll) => coll,
 }
 

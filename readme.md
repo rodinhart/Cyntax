@@ -4,7 +4,7 @@ JavaScript is a great and powerful language. However, some of its syntax can be 
 
 ## Conditionals
 
-Coding for mutiple conditionals in JavaScript can become messy. For example:
+Coding for multiple conditionals in JavaScript can become messy. For example:
 
 ```js
 // prettier-ignore
@@ -38,7 +38,7 @@ When the conditionals get more complicated we'd be better off using a switch sta
 })()
 ```
 
-Notice we had to work around the fact that switch is a statement, not an expression. There is a lot of syntactical noise with the repitition of `case`, `:` and `return`. With Cyntax:
+Notice we had to work around the fact that switch is a statement, not an expression. There is a lot of syntactical noise with the repetition of `case`, `:` and `return`. With Cyntax:
 
 ```clj
 (cond

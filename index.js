@@ -2,11 +2,11 @@ import cyntax from "./cyntax.js"
 import { prn } from "./lisp.js"
 import pql from "./pql.js"
 
-const result = pql.result
+const result = pql.main({ data: { x: [2, 3, 5, 7, 11] } })
 
 document.getElementById("output").innerText = prn(result)
-if (result?.self?.data) {
-  const df = result.self
+if (result?._self?.data) {
+  const df = result._self
   document.getElementById("table").innerHTML = `
     <table>
       <tr>${df.keys.map((key) => `<th>${key}</th>`).join("")}</tr>

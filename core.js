@@ -56,25 +56,36 @@ export default lisp(native)`
 
 (defn constantly [x] (fn [& args] x))
 
-(defn identity [x] x)
-
-(defn inc [x] (+ x 1))
-
-(defn not= [lhs rhs] (not (= lhs rhs)))
-
-(defn odd? [x] (= (% x 2) 1))
-
-(defn update [map key f x]
-  (assoc map key (f (map key) x)))
-
-(defn update-in [map keys f x]
-  (assoc-in map keys (f (get-in map keys) x)))
+(defn get
+  ([map key] (map key))
+  ([map key default] (let [tmp (map key)] (if (nil? tmp) default tmp))))
 
 (defn get-in [map keys]
   (loop [r map i 0]
     (if (< i (count keys))
       (recur (r (keys i)) (+ i 1))
       r)))
+
+(defn identity [x] x)
+
+(defn inc [x] (+ x 1))
+
+(defn nil? [x] (= x nil))
+
+(defn not= [lhs rhs] (not (= lhs rhs)))
+
+(defn odd? [x] (= (% x 2) 1))
+
+(defn tap [x] (let [tmp (log x)] x))
+
+(defn update
+  ([map key f] (assoc map key (f (map key))))
+  ([map key f x] (assoc map key (f (map key) x))))
+
+(defn update-in
+  ([map keys f] (assoc-in map keys (f (get-in map keys))))
+  ([map keys f x] (assoc-in map keys (f (get-in map keys) x))))
+
 
 (defmacro test [form expected]
   '(test* (quote ~form) ~form ~expected))
@@ -169,6 +180,8 @@ export default lisp(native)`
 
     (help (seq coll))))
 
+(defn filter-array [p arr] (into [] (filter p arr)))
+
 (defn fold [rf init coll]
   (loop [result init s (seq coll)]
     (if s
@@ -201,6 +214,11 @@ export default lisp(native)`
 (defn map-array
   ([f arr] (into [] (map f arr)))
   ([f arr1 arr2] (into [] (map f arr1 arr2))))
+
+(defn map-list [f list]
+  (if list
+    (cons (f (car list)) (map-list f (cdr list)))
+    nil))
 
 (defn range
   ([end] (range 0 end))

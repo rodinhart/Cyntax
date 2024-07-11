@@ -57,8 +57,8 @@ export default lisp(native)`
 (defn constantly [x] (fn [& args] x))
 
 (defn get
-  ([map key] (map key))
-  ([map key default] (let [tmp (map key)] (if (nil? tmp) default tmp))))
+  ([map key] (get* map key))
+  ([map key default] (let [tmp (get* map key)] (if (nil? tmp) default tmp))))
 
 (defn get-in [map keys]
   (loop [r map i 0]
@@ -76,7 +76,7 @@ export default lisp(native)`
 
 (defn odd? [x] (= (% x 2) 1))
 
-(defn tap [x] (let [tmp (log x)] x))
+(defn tap [x] (let [tmp (log x)] x)) ; depends on log
 
 (defn update
   ([map key f] (assoc map key (f (map key))))

@@ -542,6 +542,7 @@ export const native = {
 
       return r + x
     }, 0),
+  // check type here
   "-": (...xs) =>
     xs.length === 0
       ? 0
@@ -608,6 +609,7 @@ export const native = {
     // (extend Function Fn (apply [fn args]))
     "Fn/apply": (fn, args) => fn(...args),
   },
+  "get*": (x, key) => x[key] ?? null,
   "hashmap?": (x) => x?.constructor?.name === "Object",
   keys: (map) => Object.keys(map),
   List,
@@ -633,6 +635,7 @@ export const native = {
   },
   re: (source, flags) => new RegExp(source, flags),
   resolve,
+  // remove this, and use Clojure's subvec instead
   slice: (arr, start) => arr.slice(start),
   Set: {
     // (deftype Set [set])

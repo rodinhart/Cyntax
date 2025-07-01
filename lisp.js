@@ -665,7 +665,6 @@ export const native = {
       method({ ...$, name: obj, ...args }),
   },
 
-  string: (x) => (typeof x === "symbol" ? name(x) : ""),
   "symbol?": (x) => typeof x === "symbol",
   "test*": (description, actual, expected) => {
     if (!native["="](actual, expected)) {

@@ -270,7 +270,6 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 
 # TODO
 
-- remove or improve string function
 - define some protocol for contains?
   - also for assoc and dissoc and keys, everything really
 - check type for -, \*, / etc.

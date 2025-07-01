@@ -38,7 +38,9 @@ When the conditionals get more complicated we'd be better off using a switch sta
 })()
 ```
 
-Notice we had to work around the fact that switch is a statement, not an expression. There is a lot of syntactical noise with the repetition of `case`, `:` and `return`. With Cyntax:
+Notice we had to work around the fact that switch is a statement, not an expression. There is also a small gotcha: the predicates _have_ to return `true`, truthy will not suffice.
+
+There is a lot of syntactical noise with the repetition of `case`, `:` and `return`. With Cyntax:
 
 ```clj
 (cond
@@ -268,7 +270,16 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 
 # TODO
 
+- remove or improve string function, same with vector?
+- remove slide and use Clojure's subvec instead
+- define some protocol for contains?
+  - also for assoc and dissoc and keys, everything really
+- check type for -, \*, / etc.
+  - also car, cdr, everything really
+- hide resolve?
+- refactor creation of Type/invoke
 - use Map instead of { hashmap }
+  - Make hashmap proper ADT
 - fix defining something already in scope
 - multi arity in protocol ?
   - (count nil 2) doesn't throw error
@@ -277,3 +288,13 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 - allow spaces in strings - proper lexer
 - and#
 - tests
+- is export-as-object model suitable for tree shaking?
+
+# Internals
+
+- types are implemented as JavaScript classes, although built-in classes (like String and Array) are shadowed by plain object to avoid polution
+- built-in types that have literal syntax cannot be instantiated using constructor
+- nil, false, true are values, not symbols
+- nil and false are false, everything else if true
+- there is only the single quote ', which is a syntax quote
+- ~ and ~@ are unquote and unquote-splice

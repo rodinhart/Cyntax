@@ -1,9 +1,5 @@
 // Type system
 
-// (deftype Symbol [name])
-const symbol = (name) => Symbol.for(name)
-const name = (symbol) => Symbol.keyFor(symbol)
-
 // (deftype List [car cdr])
 function List(car, cdr) {
   if (!(this instanceof List)) return new List(car, cdr)
@@ -75,6 +71,7 @@ const egal = (a, b) => {
   return false
 }
 
+// Symbol lookup
 const resolve = ($, name) => {
   if (!(name in $)) {
     throw Error(`Symbol ${name} is not defined`)
@@ -84,6 +81,9 @@ const resolve = ($, name) => {
 }
 
 // Compiler
+const symbol = (name) => Symbol.for(name)
+const name = (symbol) => Symbol.keyFor(symbol)
+
 const withType = (dispatch) => (exp) => {
   const type = exp?.constructor?.name ?? "Nil"
 
@@ -91,6 +91,7 @@ const withType = (dispatch) => (exp) => {
     return dispatch[type](exp)
   }
 
+  // Make sequences first class
   if (exp?.constructor?.["Seq/first"]) {
     if ("Seq" in dispatch) {
       return dispatch["Seq"](exp)
@@ -106,8 +107,9 @@ const withType = (dispatch) => (exp) => {
   throw new Error(`Unknown dispatch for ${type}`)
 }
 
+// Compile to JavaScript
 export const genCode = withType({
-  Nil: (exp) => "null",
+  Nil: () => "null",
   Boolean: (exp) => String(exp),
   Symbol: (exp) => `$.resolve($, ${JSON.stringify(name(exp))})`,
   Number: (exp) => String(exp),
@@ -542,7 +544,6 @@ export const native = {
 
       return r + x
     }, 0),
-  // check type here
   "-": (...xs) =>
     xs.length === 0
       ? 0
@@ -556,9 +557,8 @@ export const native = {
   "<": (a, b) => a < b,
   ">": (a, b) => a > b,
 
-  // (defprotocol Fn (apply [op args]))
+  // (deftype Array [arr])
   Array: {
-    // (deftype Array [arr])
     "Type/invoke": ($, method, obj, args) =>
       method({ ...$, arr: obj, ...args }),
 
@@ -570,6 +570,7 @@ export const native = {
     "Coll/count": (arr) => arr.length,
     "Coll/seq": (arr) => ArraySeq(arr, 0),
   },
+
   ArraySeq,
   assoc: (map, ...xs) => {
     const result = { ...map }
@@ -597,15 +598,12 @@ export const native = {
 
     return result
   },
-  "eval*": (exp, $) => {
-    const expanded = macroExpand($)(exp)
-    // console.log("expanded", prn(expanded))
-    const javascript = genCode(expanded)
+  "eval*": (exp, $) => eval(`($) => ${genCode(macroExpand($)(exp))}`)($),
 
-    return eval(`($) => ${javascript}`)($)
-  },
-  // "eval*": (exp, $) => eval(`($) => ${genCode(macroExpand($)(exp))}`)($),
+  // (deftype Function [fn])
   Function: {
+    "Type/invoke": ($, method, obj, args) => method({ ...$, fn: obj, ...args }),
+
     // (extend Function Fn (apply [fn args]))
     "Fn/apply": (fn, args) => fn(...args),
   },
@@ -617,11 +615,13 @@ export const native = {
   "list?": (x) => x instanceof List,
   log: console.log,
   "macroexpand*": ($, form) => macroExpand($)(form),
-  max: (...xs) => Math.max(...xs),
+  max: (...xs) =>
+    xs.reduce((r, x) => (x > r ? x : r), Number.NEGATIVE_INFINITY),
   name,
   not: (x) => x === false || x === null,
+
+  // (deftype Object [obj])
   Object: {
-    // (deftype Object [obj])
     "Type/invoke": ($, method, obj, args) => method({ ...$, obj, ...args }),
 
     // (extend Object Fn (apply [obj [key]]))
@@ -633,12 +633,13 @@ export const native = {
     "Coll/count": (obj) => Object.keys(obj).length,
     "Coll/seq": (obj) => ArraySeq(Object.entries(obj), 0),
   },
+
   re: (source, flags) => new RegExp(source, flags),
   resolve,
-  // remove this, and use Clojure's subvec instead
   slice: (arr, start) => arr.slice(start),
+
+  // (deftype Set [set])
   Set: {
-    // (deftype Set [set])
     "Type/invoke": ($, method, obj, args) => method({ ...$, obj, ...args }),
 
     // (extend Set Coll ...)
@@ -646,8 +647,9 @@ export const native = {
     "Coll/count": (set) => set.size,
     "Coll/seq": (set) => ArraySeq([...set], 0),
   },
+
+  // (deftype String [s])
   String: {
-    // (deftype String [s])
     "Type/invoke": ($, method, obj, args) => method({ ...$, s: obj, ...args }),
 
     // (extend String Coll ...)
@@ -655,6 +657,13 @@ export const native = {
     "Coll/count": (s) => s.length,
     "Coll/seq": (s) => new ArraySeq(s.split(""), 0),
   },
+
+  // (deftype Symbol [name])
+  Symbol: {
+    "Type/invoke": ($, method, obj, args) =>
+      method({ ...$, name: obj, ...args }),
+  },
+
   string: (x) => (typeof x === "symbol" ? name(x) : ""),
   "symbol?": (x) => typeof x === "symbol",
   "test*": (description, actual, expected) => {
@@ -675,27 +684,25 @@ const debug = (...args) => {
   // console.log(...args)
 }
 
-export const lisp =
-  ($) =>
-  (strings, ...exps) => {
-    const code = read(`[${strings.join("")}]`)
-    debug("code", prn(code))
+export const lisp = ($) => (strings) => {
+  const code = read(`[${strings.join("")}]`)
+  debug("code", prn(code))
 
-    const $2 = { ...$ }
-    code.forEach((form) => {
-      debug("---")
-      debug("form", prn(form))
+  const $2 = { ...$ }
+  code.forEach((form) => {
+    debug("---")
+    debug("form", prn(form))
 
-      const expanded = macroExpand($2)(form)
-      debug("expanded", prn(expanded))
+    const expanded = macroExpand($2)(form)
+    debug("expanded", prn(expanded))
 
-      const javascript = genCode(expanded)
-      debug("javascript", javascript)
+    const javascript = genCode(expanded)
+    debug("javascript", javascript)
 
-      const compiled = eval(`(($) => ${javascript})`)
+    const compiled = eval(`(($) => ${javascript})`)
 
-      compiled($2)
-    })
+    compiled($2)
+  })
 
-    return Object.fromEntries(Object.entries($2).filter(([key]) => !(key in $)))
-  }
+  return Object.fromEntries(Object.entries($2).filter(([key]) => !(key in $)))
+}

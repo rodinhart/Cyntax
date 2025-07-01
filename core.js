@@ -76,6 +76,10 @@ export default lisp(native)`
 
 (defn odd? [x] (= (% x 2) 1))
 
+(defn slice
+  ([arr start] (slice* arr start nil))
+  ([arr start end] (slice* arr start end)))
+
 (defn tap [x] (let [tmp (log x)] x)) ; depends on log
 
 (defn update

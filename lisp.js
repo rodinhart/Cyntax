@@ -636,7 +636,7 @@ export const native = {
 
   re: (source, flags) => new RegExp(source, flags),
   resolve,
-  slice: (arr, start) => arr.slice(start),
+  "slice*": (arr, start, end) => arr.slice(start, end ?? undefined),
 
   // (deftype Set [set])
   Set: {

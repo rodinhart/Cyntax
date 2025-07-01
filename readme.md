@@ -271,7 +271,7 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 # TODO
 
 - remove or improve string function, same with vector?
-- remove slide and use Clojure's subvec instead
+- vector or array?
 - define some protocol for contains?
   - also for assoc and dissoc and keys, everything really
 - check type for -, \*, / etc.

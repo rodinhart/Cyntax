@@ -270,12 +270,6 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 
 # TODO
 
-- define some protocol for contains?
-  - also for assoc and dissoc and keys, everything really
-- check type for -, \*, / etc.
-  - also car, cdr, everything really
-- hide resolve?
-- refactor creation of Type/invoke
 - use Map instead of { hashmap }
   - Make hashmap proper ADT
 - fix defining something already in scope
@@ -283,7 +277,6 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
   - (count nil 2) doesn't throw error
   - protocol Blah (foo []) (foo [x]) ?
 - destructering
-- allow spaces in strings - proper lexer
 - and#
 - tests
 - is export-as-object model suitable for tree shaking?

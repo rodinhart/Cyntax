@@ -448,7 +448,10 @@ export const read = (input) => {
     }
 
     if (x[0] === '"') {
-      return x.substring(1, x.length - 1)
+      return x
+        .substring(1, x.length - 1)
+        .replace(/<SPACE>/g, " ")
+        .replace(/<NEWLINE>/g, "\n")
     }
 
     if (x === "'") {
@@ -527,8 +530,20 @@ export const read = (input) => {
 
   return _(
     input
+      // handle comments
       .replace(/;[^\n]+\n/g, "")
+
+      // replace spaces in quoted strings
+      .replace(
+        /"([^"\\]*(?:\\.[^"\\]*)*)"/g,
+        (_, str) =>
+          `"${str.replace(/ /g, "<SPACE>").replace(/\n/g, "<NEWLINE>")}"`
+      )
+
+      // isolate brackets and quote operators
       .replace(/([()\[\]\{\}'~@])/g, " $1 ")
+
+      // split on whitespace
       .trim()
       .split(/[\s,]+/)
   )
@@ -608,6 +623,7 @@ export const native = {
     // (extend Function Fn (apply [fn args]))
     "Fn/apply": (fn, args) => fn(...args),
   },
+
   "get*": (x, key) => x[key] ?? null,
   "hashmap?": (x) => x?.constructor?.name === "Object",
   keys: (map) => Object.keys(map),

@@ -571,6 +571,7 @@ export const native = {
     "Coll/seq": (arr) => ArraySeq(arr, 0),
   },
 
+  array: (...coll) => coll,
   ArraySeq,
   assoc: (map, ...xs) => {
     const result = { ...map }
@@ -677,7 +678,6 @@ export const native = {
   },
   "upper-case": (s) => s.toUpperCase(),
   vals: (map) => Object.values(map),
-  vector: (...coll) => coll,
 }
 
 const debug = (...args) => {

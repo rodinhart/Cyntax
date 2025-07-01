@@ -46,7 +46,7 @@ lisp({ ...native, ...core })`
   (update-in { "a" { "c" 6 } } ["a" "c"] + 7)
   { "a" { "c" 13 } })
 (test
-  (update-in nil ["a" "b"] vector 1)
+  (update-in nil ["a" "b"] array 1)
   { "a" { "b" [nil 1] } })
 
 (test (get-in { "a" { "b" 10 } } ["a" "b"]) 10)

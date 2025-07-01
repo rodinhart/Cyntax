@@ -154,6 +154,8 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 
 **apply**
 
+**array**
+
 **assoc**
 
 **assoc-in**
@@ -266,12 +268,9 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 
 **vals**
 
-**vector**
-
 # TODO
 
-- remove or improve string function, same with vector?
-- vector or array?
+- remove or improve string function
 - define some protocol for contains?
   - also for assoc and dissoc and keys, everything really
 - check type for -, \*, / etc.

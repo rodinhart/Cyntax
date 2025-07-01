@@ -48,12 +48,8 @@ const egal = (a, b) => {
     return true
   }
 
-  if (ta === "Object") {
-    if (Object.keys(a).length !== Object.keys(b).length) {
-      return false
-    }
-
-    return Object.entries(a).every(([key, val]) => egal(val, b[key]))
+  if (ta === "List") {
+    return egal([...a], [...b])
   }
 
   if (ta === "Array") {
@@ -64,8 +60,20 @@ const egal = (a, b) => {
     return a.every((x, i) => egal(x, b[i]))
   }
 
-  if (ta === "List") {
-    return egal([...a], [...b])
+  if (ta === "Map") {
+    if (a.size !== b.size) {
+      return false
+    }
+
+    return [...a].every(([key, val]) => b.has(key) && egal(val, b.get(key)))
+  }
+
+  if (ta === "Object") {
+    if (Object.keys(a).length !== Object.keys(b).length) {
+      return false
+    }
+
+    return Object.entries(a).every(([key, val]) => egal(val, b[key]))
   }
 
   return false
@@ -339,7 +347,7 @@ export const genCode = withType({
     if (op === symbol("quote")) {
       // (quote exp)
       const quote = withType({
-        Nil: (exp) => "null",
+        Nil: () => "null",
         Boolean: (exp) => String(exp),
         Symbol: (exp) => `Symbol.for(${JSON.stringify(name(exp))})`,
         Number: (exp) => String(exp),
@@ -354,7 +362,7 @@ export const genCode = withType({
           return `$["list"](${[...exp].map(quote).join(",")})`
         },
         Array: (exp) => `[${exp.map(quote).join(",")}]`,
-        Object: (exp) => `({ hashmap: ${quote(exp.hashmap)} })`,
+        Map: (exp) => `new Map(${quote([...exp])})`,
       })
 
       return quote(rands[0])
@@ -365,11 +373,8 @@ export const genCode = withType({
       .join(", ")}])`
   },
   Array: (exp) => `[${exp.map(genCode).join(",")}]`,
-  Object: (exp) =>
-    `({ ${exp.hashmap
-      .map(([key, val]) => `[${genCode(key)}]: ${genCode(val)}`)
-      .join(", ")} })`,
-  Set: (exp) => `new Set(${genCode([...exp.values()])})`,
+  Map: (exp) => `new Map(${genCode([...exp])})`,
+  Set: (exp) => `new Set(${genCode([...exp])})`,
 })
 
 export const macroExpand = ($) =>
@@ -392,13 +397,8 @@ export const macroExpand = ($) =>
       return list(macroExpand($)(op), ...rands.map(macroExpand($)))
     },
     Array: (exp) => exp.map(macroExpand($)),
-    Object: (exp) => ({
-      hashmap: exp.hashmap.map(([key, val]) => [
-        macroExpand($)(key),
-        macroExpand($)(val),
-      ]),
-    }),
-    Set: (exp) => new Set([...exp].map(macroExpand($))),
+    Map: (exp) => new Map(macroExpand($)([...exp])),
+    Set: (exp) => new Set(macroExpand($)([...exp])),
   })
 
 export const prn = withType({
@@ -419,10 +419,8 @@ export const prn = withType({
 
     return `(${r.map(prn).join(" ")})`
   },
-  Object: (exp) =>
-    `{ ${(exp.hashmap ?? Object.entries(exp))
-      .map(([key, val]) => `${prn(key)} ${prn(val)}`)
-      .join(", ")} }`,
+  Map: (exp) =>
+    `{ ${[...exp].map(([key, val]) => `${prn(key)} ${prn(val)}`).join(", ")} }`,
   Set: (exp) => `#{${[...exp].map((x) => prn(x)).join(" ")}}`,
   "?": (exp) => `[type ${exp?.constructor?.name}]`,
 })
@@ -495,18 +493,16 @@ export const read = (input) => {
     }
 
     if (x === "{") {
-      const hashmap = []
+      const hashmap = new Map()
       while (xs.length > 1 && xs[0] !== "}") {
-        hashmap.push([_(xs), _(xs)])
+        hashmap.set(_(xs), _(xs))
       }
 
       if (xs.shift() !== "}") {
         throw new Error(`Expected closing }`)
       }
 
-      return {
-        hashmap,
-      }
+      return hashmap
     }
 
     if (x === "#") {
@@ -589,9 +585,9 @@ export const native = {
   array: (...coll) => coll,
   ArraySeq,
   assoc: (map, ...xs) => {
-    const result = { ...map }
+    const result = new Map([...(map ?? [])])
     for (let i = 0; i + 1 < xs.length; i += 2) {
-      result[xs[i]] = xs[i + 1]
+      result.set(xs[i], xs[i + 1])
     }
 
     return result
@@ -605,10 +601,10 @@ export const native = {
       : elements.every((key) => key in coll),
   dissoc: (map, ...keys) => {
     const set = new Set(keys)
-    const result = {}
-    for (const [key, val] of Object.entries(map)) {
+    const result = new Map()
+    for (const [key, val] of [...map]) {
       if (!set.has(key)) {
-        result[key] = val
+        result.set(key, val)
       }
     }
 
@@ -626,7 +622,7 @@ export const native = {
 
   "get*": (x, key) => x[key] ?? null,
   "hashmap?": (x) => x?.constructor?.name === "Object",
-  keys: (map) => Object.keys(map),
+  keys: (map) => [...map.keys()],
   List,
   list,
   "list?": (x) => x instanceof List,
@@ -637,18 +633,18 @@ export const native = {
   name,
   not: (x) => x === false || x === null,
 
-  // (deftype Object [obj])
-  Object: {
-    "Type/invoke": ($, method, obj, args) => method({ ...$, obj, ...args }),
+  // (deftype Map [map])
+  Map: {
+    "Type/invoke": ($, method, obj, args) =>
+      method({ ...$, map: obj, ...args }),
 
-    // (extend Object Fn (apply [obj [key]]))
-    "Fn/apply": (obj, [key]) =>
-      obj[typeof key == "symbol" ? name(key) : key] ?? null, // check arity
+    // (extend Map Fn (apply [obj [key]]))
+    "Fn/apply": (obj, [key]) => obj.get(key) ?? null,
 
     // (extend Object Coll ...)
-    "Coll/conj": (obj, item) => ({ ...obj, [item[0]]: item[1] }),
-    "Coll/count": (obj) => Object.keys(obj).length,
-    "Coll/seq": (obj) => ArraySeq(Object.entries(obj), 0),
+    "Coll/conj": (map, item) => new Map([...map, item]),
+    "Coll/count": (map) => map.size,
+    "Coll/seq": (map) => ArraySeq([...map], 0),
   },
 
   re: (source, flags) => new RegExp(source, flags),

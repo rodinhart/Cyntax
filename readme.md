@@ -270,8 +270,6 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 
 # TODO
 
-- use Map instead of { hashmap }
-  - Make hashmap proper ADT
 - fix defining something already in scope
 - multi arity in protocol ?
   - (count nil 2) doesn't throw error
@@ -280,6 +278,8 @@ Exports from Cyntax have to be in object form for two reasons: Module `import` a
 - and#
 - tests
 - is export-as-object model suitable for tree shaking?
+- add Set to egal
+- sourcemap
 
 # Internals
 

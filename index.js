@@ -1,8 +1,7 @@
 import cyntax from "./cyntax.js"
 import { prn } from "./lisp.js"
-import pql from "./pql.js"
 
-const result = pql.main({ data: { x: [2, 3, 5, 7, 11] } })
+const result = null
 
 document.getElementById("output").innerText = prn(result)
 if (result?.SELF?.data) {
@@ -23,4 +22,4 @@ if (result?.SELF?.data) {
   `
 }
 
-window.c = (t) => prn(cyntax(pql)([`(def __ ${t})`]).__)
+window.c = (t) => prn(cyntax({})([`(def __ ${t})`]).__)

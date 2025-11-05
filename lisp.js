@@ -450,6 +450,7 @@ export const read = (input) => {
         .substring(1, x.length - 1)
         .replace(/<SPACE>/g, " ")
         .replace(/<NEWLINE>/g, "\n")
+        .replace(/<COMMA>/g, ",")
     }
 
     if (x === "'") {
@@ -533,7 +534,10 @@ export const read = (input) => {
       .replace(
         /"([^"\\]*(?:\\.[^"\\]*)*)"/g,
         (_, str) =>
-          `"${str.replace(/ /g, "<SPACE>").replace(/\n/g, "<NEWLINE>")}"`
+          `"${str
+            .replace(/ /g, "<SPACE>")
+            .replace(/\n/g, "<NEWLINE>")
+            .replace(/,/g, "<COMMA>")}"`
       )
 
       // isolate brackets and quote operators
@@ -688,7 +692,7 @@ export const native = {
     }
   },
   "upper-case": (s) => s.toUpperCase(),
-  vals: (map) => Object.values(map),
+  vals: (map) => [...map.values()],
 }
 
 const debug = (...args) => {

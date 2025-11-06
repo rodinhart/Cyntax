@@ -1,25 +1,7 @@
+import * as kernel from "./kernel.js"
+import { List, list, cons } from "./list.js"
+
 // Type system
-
-// (deftype List [car cdr])
-function List(car, cdr) {
-  if (!(this instanceof List)) return new List(car, cdr)
-
-  this.car = car
-  this.cdr = cdr
-}
-List["Type/invoke"] = ($, method, obj, args) =>
-  method({ ...$, car: obj.car, cdr: obj.cdr, ...args })
-
-List.prototype[Symbol.iterator] = function* () {
-  let c = this
-  while (c) {
-    yield c.car
-    c = c.cdr
-  }
-}
-
-const cons = (car, cdr) => List(car, cdr)
-const list = (...xs) => [...xs].reverse().reduce((r, x) => List(x, r), null)
 
 // (deftype ArraySeq [arr i])
 function ArraySeq(arr, i) {
@@ -30,54 +12,6 @@ function ArraySeq(arr, i) {
 }
 ArraySeq["Type/invoke"] = ($, method, obj, args) =>
   method({ ...$, arr: obj.arr, i: obj.i, ...args })
-
-// Runtime helpers
-const egal = (a, b) => {
-  const ta = a?.constructor?.name ?? "Nil"
-  const tb = b?.constructor?.name ?? "Nil"
-
-  if (ta !== tb) {
-    return false
-  }
-
-  if (typeof a !== "object" && a === b) {
-    return true
-  }
-
-  if (a === null && b === null) {
-    return true
-  }
-
-  if (ta === "List") {
-    return egal([...a], [...b])
-  }
-
-  if (ta === "Array") {
-    if (a.length !== b.length) {
-      return false
-    }
-
-    return a.every((x, i) => egal(x, b[i]))
-  }
-
-  if (ta === "Map") {
-    if (a.size !== b.size) {
-      return false
-    }
-
-    return [...a].every(([key, val]) => b.has(key) && egal(val, b.get(key)))
-  }
-
-  if (ta === "Object") {
-    if (Object.keys(a).length !== Object.keys(b).length) {
-      return false
-    }
-
-    return Object.entries(a).every(([key, val]) => egal(val, b[key]))
-  }
-
-  return false
-}
 
 // Symbol lookup
 const resolve = ($, name) => {
@@ -568,7 +502,7 @@ export const native = {
   "*": (...xs) => xs.reduce((r, x) => r * x, 1),
   "/": (a, b) => a / b,
   "%": (a, b) => a % b,
-  "=": (a, b) => egal(a, b),
+  "=": (a, b) => kernel.egal(a, b),
   "<": (a, b) => a < b,
   ">": (a, b) => a > b,
 

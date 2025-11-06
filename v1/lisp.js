@@ -1,5 +1,5 @@
-import * as kernel from "./kernel.js"
-import { List, list, cons } from "./list.js"
+import * as kernel from "../kernel.js"
+import { List, list, cons } from "../list.js"
 
 // Type system
 

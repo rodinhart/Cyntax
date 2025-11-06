@@ -1,5 +1,6 @@
 import * as kernel from "../kernel.js"
 import { List, list, cons } from "../list.js"
+import { withType } from "../compiler.js"
 
 // Type system
 
@@ -26,31 +27,8 @@ const resolve = ($, name) => {
 const symbol = (name) => Symbol.for(name)
 const name = (symbol) => Symbol.keyFor(symbol)
 
-const withType = (dispatch) => (exp) => {
-  const type = exp?.constructor?.name ?? "Nil"
-
-  if (type in dispatch) {
-    return dispatch[type](exp)
-  }
-
-  // Make sequences first class
-  if (exp?.constructor?.["Seq/first"]) {
-    if ("Seq" in dispatch) {
-      return dispatch["Seq"](exp)
-    }
-
-    throw new Error(`Unknown dispatch for Seq (${type})`)
-  }
-
-  if ("?" in dispatch) {
-    return dispatch["?"](exp)
-  }
-
-  throw new Error(`Unknown dispatch for ${type}`)
-}
-
 // Compile to JavaScript
-export const genCode = withType({
+export const genCode = withType("GenCode", {
   Nil: () => "null",
   Boolean: (exp) => String(exp),
   Symbol: (exp) => `$.resolve($, ${JSON.stringify(name(exp))})`,
@@ -280,7 +258,7 @@ export const genCode = withType({
 
     if (op === symbol("quote")) {
       // (quote exp)
-      const quote = withType({
+      const quote = withType("Quote", {
         Nil: () => "null",
         Boolean: (exp) => String(exp),
         Symbol: (exp) => `Symbol.for(${JSON.stringify(name(exp))})`,
@@ -312,7 +290,7 @@ export const genCode = withType({
 })
 
 export const macroExpand = ($) =>
-  withType({
+  withType("MacroExpand", {
     Nil: (exp) => exp,
     Boolean: (exp) => exp,
     Symbol: (exp) => exp,
@@ -335,7 +313,7 @@ export const macroExpand = ($) =>
     Set: (exp) => new Set(macroExpand($)([...exp])),
   })
 
-export const prn = withType({
+export const prn = withType("prn", {
   Nil: (exp) => "nil",
   Boolean: (exp) => String(exp),
   Symbol: (exp) => name(exp),

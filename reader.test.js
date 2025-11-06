@@ -9,3 +9,5 @@ equals(read(" ( ) "), list.list())
 equals(read(" ( x  2 ) "), list.list(Symbol.for("x"), new Number(2)))
 
 equals(read("[x y z]"), [Symbol.for("x"), Symbol.for("y"), Symbol.for("z")])
+
+equals(read(`"Hello \\" World"`), new String('Hello " World'))

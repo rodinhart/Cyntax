@@ -33,7 +33,13 @@ list: = (# items ws# )#
 
 array: = [# items ws# ]#
 
-expr = number: | symbol: | list: | array:
+chars* = /92 " chars* | ^" chars* | #
+
+"# = "
+
+string: = "# chars* "#
+
+expr = number: | symbol: | list: | array: | string:
 
 cyntax = ws# expr ws#
 `

@@ -25,6 +25,8 @@ export default (s) => {
     list: (pos, ...items) => withPos(list.list(...items.map(_)), pos),
 
     array: (pos, ...items) => withPos(items.map(_), pos),
+
+    string: (pos, s) => withPos(new String(s.replace(/\\(.)/g, "$1")), pos),
   }
 
   const _ = (x) => {

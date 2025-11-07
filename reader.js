@@ -4,8 +4,9 @@ import * as list from "./list.js"
 
 const rules = ubnf.parseGrammar(grammar)
 
-const POS = Symbol()
+export const POS = Symbol.for("reader-pos")
 
+// what about symbols!
 const withPos = (obj, pos) =>
   obj !== null && typeof obj === "object"
     ? Object.assign(obj, { [POS]: pos })

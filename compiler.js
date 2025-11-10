@@ -1,5 +1,6 @@
 import * as list from "./list.js"
 
+// dispatch by lisp type
 export const withType = (name, dispatch) => (exp) => {
   const type = exp?.constructor?.name ?? "Nil"
 
@@ -23,6 +24,7 @@ export const withType = (name, dispatch) => (exp) => {
   throw new Error(`${name} has no dispatch for ${type}`)
 }
 
+// compile lisp structures to javascript
 const compile = withType("Compiler", {
   Nil: () => "null",
 
